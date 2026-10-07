@@ -15,8 +15,8 @@ to tell apart.
   are working on in the name.
 - **Color** per folder: each folder hashes to one of the eight `/color`
   colors, and moves to the next free one if another live session has it.
-- **Stays current**: after a turn that switched branches, or a `/model`, the
-  name is updated. A `/rename` you type yourself stops that for the session.
+- **Stays current**: after a turn that switched branches, a `/model`, or a
+  `! cd` you type into another folder, the name is updated. A `/rename` you type yourself stops that for the session.
 - **Resume aware**: a session reopened with `--resume` or `/relaunch` gets its
   number and color back. A session it never tagged (an older resume, or one
   already running when you install the mod) keeps its name and color until
@@ -123,7 +123,10 @@ data anywhere; everything below stays local.
   prompts or the conversation: `topic` is only what you type after
   `/nametag topic`. No tokens, keys or credentials.
 - **Hooks:** `session.start` registers `/nametag` and tags the session;
-  `turn.complete` re-checks git after each turn; `command.run` handles
+  `turn.start` only marks that a turn is running (the prompt is not read), so
+  a `cd` Claude makes is not followed; `turn.complete` re-checks git after
+  each turn; every 2 seconds it looks at the shell's folder to follow a
+  `! cd` you type; `command.run` handles
   `/nametag`, notices a manual `/rename` or `/color` and refreshes after
   `/model`; `session.end` keeps the name across `/clear` and `/relaunch`.
 - **What it stores:** a small record per session in the mod's own store on

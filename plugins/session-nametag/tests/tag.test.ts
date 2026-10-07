@@ -57,9 +57,9 @@ describe('render', () => {
     expect(render(PRESETS.full, { ...V, n: 1, branch: '' })).toBe('[Opus 5.5] hess-laundry @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am')
   })
 
-  test('num always shows, n hides the first instance', () => {
+  test('num always shows, nth hides the first instance', () => {
     expect(render('{folder} #{num}', { ...V, n: 1 })).toBe('hess-laundry #1')
-    expect(render('{folder}{ #n}', { ...V, n: 1 })).toBe('hess-laundry')
+    expect(render('{folder}{ #nth}', { ...V, n: 1 })).toBe('hess-laundry')
   })
 
   test('text outside groups and groups without tokens are kept', () => {
@@ -144,7 +144,7 @@ describe('picking', () => {
 
 describe('config', () => {
   test('defaults fill what is missing', () => {
-    expect(asConfig(undefined)).toEqual({ template: 'full', color: 'auto', isOn: true, offFolders: [], saved: {} })
+    expect(asConfig(undefined)).toEqual({ template: 'full', color: 'auto', isOn: true, offFolders: [], saved: {}, sigils: {} })
     expect(asConfig({ template: 'compact', isOn: false }).template).toBe('compact')
   })
 })
@@ -198,7 +198,7 @@ describe('typeahead', () => {
 
   test('the options after /nametag', () => {
     expect(at('/nametag c').map((s) => s.text)).toEqual(['compact', 'color'])
-    expect(at('/nametag t').map((s) => s.text)).toEqual(['timed', 'template'])
+    expect(at('/nametag t').map((s) => s.text)).toEqual(['timed', 'template', 'topic'])
   })
 
   test('colors and here', () => {

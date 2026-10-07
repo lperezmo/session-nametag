@@ -11,17 +11,18 @@ export const COLORS = ['red', 'blue', 'green', 'yellow', 'purple', 'orange', 'pi
 export type ColorName = (typeof COLORS)[number]
 
 /** Named templates, from compact to detailed. `full` is the default. */
-export const PRESET_ORDER = ['compact', 'branch', 'host', 'model', 'timed', 'full'] as const
+export const PRESET_ORDER = ['compact', 'branch', 'status', 'host', 'model', 'timed', 'full'] as const
 
 export type PresetName = (typeof PRESET_ORDER)[number]
 
 export const PRESETS: Record<PresetName, string> = {
-  compact: '{folder}{ #n}',
-  branch: '{folder}{/branch}{ #n}',
-  host: '{folder}{/branch}{ #n}{ @ host}',
-  model: '{[model] }{folder}{/branch}{ #n}{ @ host}',
-  timed: '{[model] }{folder}{/branch}{ #n}{ @ host}{ day time}',
-  full: '{[model] }{folder}{/branch}{ #n}{ @ host}{ datetime}',
+  compact: '{folder}{ #nth}',
+  branch: '{folder}{/branch}{ #nth}',
+  status: '{sigil }{folder}{/branch}{dirty}{ ↑ahead}{ #nth}{ · topic}',
+  host: '{folder}{/branch}{ #nth}{ @ host}',
+  model: '{[model] }{folder}{/branch}{ #nth}{ @ host}',
+  timed: '{[model] }{folder}{/branch}{ #nth}{ @ host}{ day time}',
+  full: '{[model] }{folder}{/branch}{ #nth}{ @ host}{ datetime}',
 }
 
 /**
@@ -64,10 +65,30 @@ export type TagValues = {
   startedAt: number
   /** When the name last changed for a reason other than this time itself. */
   updatedAt: number
+  /** What the session is about: from the first prompt, or /nametag topic. */
+  topic?: string
+  /** Uncommitted changes in the working tree. */
+  isDirty?: boolean
+  /** Commits not pushed to the upstream branch. */
+  ahead?: number
+  /** The origin remote as owner/name. */
+  remote?: string
+  /** The last commit's subject, shortened. */
+  lastcommit?: string
+  /** Two words that stay with the session for life. */
+  codename?: string
+  /** The folder's emoji. */
+  sigil?: string
+  /** This session's place among the sessions opened today on this machine. */
+  today?: number
 }
 
 /** The token names a template may use. */
-export const TOKENS = ['model', 'family', 'folder', 'dir', 'branch', 'num', 'n', 'host', 'datetime', 'date', 'day', 'time', 'updated', 'updateddatetime', 'updateddate'] as const
+export const TOKENS = [
+  'model', 'family', 'folder', 'dir', 'remote', 'branch', 'dirty', 'ahead', 'lastcommit', 'num', 'nth', 'host',
+  'topic', 'codename', 'sigil', 'todaycount',
+  'datetime', 'date', 'day', 'time', 'updated', 'updateddatetime', 'updateddate',
+] as const
 
 export type Token = (typeof TOKENS)[number]
 
@@ -78,7 +99,15 @@ export const TOKEN_HELP: Record<Token, string> = {
   folder: 'the repository (worktrees and subfolders share it)',
   dir: 'the folder the session started in',
   branch: 'git branch; the group hides outside git',
-  n: 'instance number; hidden for the first session in a folder',
+  remote: 'the origin remote, e.g. lperezmo/hess-trading',
+  dirty: '* when there are uncommitted changes',
+  ahead: 'commits not pushed yet; hidden at 0',
+  lastcommit: 'the last commit message, shortened',
+  nth: 'instance number; hidden for the first session in a folder',
+  topic: 'what the session is about: the first prompt, or /nametag topic <text>',
+  codename: 'two words that stay with the session, e.g. brisk-otter',
+  sigil: 'the folder emoji (/nametag sigil <emoji> picks one)',
+  todaycount: 'which session this is today on this machine, e.g. 7',
   num: 'instance number, always shown',
   host: 'this machine\'s name',
   datetime: 'session start, e.g. Wed Oct 7th, 2026 9:05 am',
@@ -95,7 +124,12 @@ export const SNIPPETS: readonly { text: string; token: Token }[] = [
   { text: '{[model] }', token: 'model' },
   { text: '{[family] }', token: 'family' },
   { text: '{/branch}', token: 'branch' },
-  { text: '{ #n}', token: 'n' },
+  { text: '{ #nth}', token: 'nth' },
+  { text: '{dirty}', token: 'dirty' },
+  { text: '{ ↑ahead}', token: 'ahead' },
+  { text: '{ · topic}', token: 'topic' },
+  { text: '{sigil }', token: 'sigil' },
+  { text: '{ #todaycount today}', token: 'todaycount' },
   { text: '{ @ host}', token: 'host' },
   { text: '{ · updated}', token: 'updated' },
 ]
@@ -210,6 +244,24 @@ export function folderKey(path: string): string {
 }
 
 /**
+ * The tokens a template uses, so only those values are worked out (each git
+ * call costs a little on every turn).
+ *
+ * @param template the template text
+ */
+export function usedTokens(template: string): Set<Token> {
+  const used = new Set<Token>()
+
+  for (const group of template.matchAll(/\{([^{}]*)\}/g)) {
+    for (const m of (group[1] ?? '').matchAll(new RegExp(TOKEN_RE.source, 'g'))) {
+      used.add(m[1] as Token)
+    }
+  }
+
+  return used
+}
+
+/**
  * Whether a folder is the other one or inside it, either separator, any case.
  *
  * @param child the folder that may be inside
@@ -239,7 +291,15 @@ export function render(template: string, v: TagValues): string {
       case 'folder': return v.folder
       case 'dir': return v.dir
       case 'branch': return v.branch
-      case 'n': return v.n > 1 ? String(v.n) : ''
+      case 'nth': return v.n > 1 ? String(v.n) : ''
+      case 'remote': return v.remote ?? ''
+      case 'dirty': return v.isDirty ? '*' : ''
+      case 'ahead': return v.ahead ? String(v.ahead) : ''
+      case 'lastcommit': return v.lastcommit ?? ''
+      case 'topic': return v.topic ?? ''
+      case 'codename': return v.codename ?? ''
+      case 'sigil': return v.sigil ?? ''
+      case 'todaycount': return v.today ? String(v.today) : ''
       case 'num': return String(v.n)
       case 'host': return v.host
       case 'family': return v.model.split(' ')[0] ?? ''
@@ -296,7 +356,7 @@ export function resolveTemplate(template: string, saved: Readonly<Record<string,
 }
 
 /** Words a saved template may not be called: the presets and the options. */
-export const RESERVED = ['presets', 'list', 'preview', 'template', 'force', 'apply', 'now', 'color', 'colour', 'off', 'on', 'help', 'save', 'delete', 'remove'] as const
+export const RESERVED = ['presets', 'list', 'preview', 'template', 'force', 'apply', 'now', 'color', 'colour', 'off', 'on', 'help', 'save', 'delete', 'remove', 'topic', 'sigil'] as const
 
 /** How many saved templates the store keeps. */
 export const MAX_SAVED = 20
@@ -388,6 +448,14 @@ export type LiveEntry = {
   updatedAt?: number
   /** The folder /nametag force pinned the session to; absent, where it started. */
   root?: string
+  /** What the session is about; set from the first prompt or by /nametag topic. */
+  topic?: string
+  /** True once /nametag topic set it by hand (or switched it off). */
+  isTopicSet?: boolean
+  /** Two words that stay with the session for life. */
+  codename?: string
+  /** Its place among the sessions opened that day on this machine. */
+  today?: number
 }
 
 /** A session's name and color, kept after it ends so a resume can restore them. */
@@ -400,6 +468,14 @@ export type SeenEntry = {
   at: number
   updatedAt?: number
   root?: string
+  /** What the session is about; set from the first prompt or by /nametag topic. */
+  topic?: string
+  /** True once /nametag topic set it by hand (or switched it off). */
+  isTopicSet?: boolean
+  /** Two words that stay with the session for life. */
+  codename?: string
+  /** Its place among the sessions opened that day on this machine. */
+  today?: number
 }
 
 /** The person's choices, shared by every session on the machine. */
@@ -414,9 +490,11 @@ export type Config = {
   offFolders: string[]
   /** The person's own templates by name (`/nametag save`). */
   saved: Record<string, string>
+  /** Emoji the person picked per folder key (`/nametag sigil`). */
+  sigils: Record<string, string>
 }
 
-export const DEFAULT_CONFIG: Config = { template: DEFAULT_PRESET, color: 'auto', isOn: true, offFolders: [], saved: {} }
+export const DEFAULT_CONFIG: Config = { template: DEFAULT_PRESET, color: 'auto', isOn: true, offFolders: [], saved: {}, sigils: {} }
 
 /**
  * A stored value as a Config, defaults filling whatever is missing or wrong.
@@ -432,6 +510,7 @@ export function asConfig(raw: unknown): Config {
     isOn: typeof o.isOn === 'boolean' ? o.isOn : DEFAULT_CONFIG.isOn,
     offFolders: Array.isArray(o.offFolders) ? o.offFolders.filter((x): x is string => typeof x === 'string') : [],
     saved: asSaved(o.saved),
+    sigils: asStrings(o.sigils),
   }
 }
 
@@ -440,6 +519,20 @@ export function asConfig(raw: unknown): Config {
  *
  * @param raw what the store held
  */
+function asStrings(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = {}
+
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    for (const [k, v] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof v === 'string' && v.trim()) {
+        out[k] = v
+      }
+    }
+  }
+
+  return out
+}
+
 function asSaved(raw: unknown): Record<string, string> {
   const out: Record<string, string> = {}
 
@@ -480,6 +573,10 @@ export function asLive(raw: unknown): LiveEntry | null {
     isManual: o.isManual === true,
     ...(typeof o.updatedAt === 'number' ? { updatedAt: o.updatedAt } : {}),
     ...(typeof o.root === 'string' ? { root: o.root } : {}),
+    ...(typeof o.topic === 'string' ? { topic: o.topic } : {}),
+    ...(o.isTopicSet === true ? { isTopicSet: true } : {}),
+    ...(typeof o.codename === 'string' ? { codename: o.codename } : {}),
+    ...(typeof o.today === 'number' ? { today: o.today } : {}),
   }
 }
 
@@ -508,6 +605,10 @@ export function asSeen(raw: unknown): SeenEntry | null {
     isManual: o.isManual === true,
     ...(typeof o.updatedAt === 'number' ? { updatedAt: o.updatedAt } : {}),
     ...(typeof o.root === 'string' ? { root: o.root } : {}),
+    ...(typeof o.topic === 'string' ? { topic: o.topic } : {}),
+    ...(o.isTopicSet === true ? { isTopicSet: true } : {}),
+    ...(typeof o.codename === 'string' ? { codename: o.codename } : {}),
+    ...(typeof o.today === 'number' ? { today: o.today } : {}),
   }
 }
 
@@ -564,6 +665,8 @@ export type Parsed =
   | { kind: 'save'; name: string; template: string | null }
   | { kind: 'delete'; name: string }
   | { kind: 'named'; name: string }
+  | { kind: 'topic'; mode: 'set' | 'auto' | 'off' | 'show'; text: string }
+  | { kind: 'sigil'; emoji: string | null }
   | { kind: 'error'; text: string }
 
 export const USAGE = [
@@ -575,6 +678,8 @@ export const USAGE = [
   '  /nametag save <name>      keep the template in use under a name; /nametag <name> brings it back',
   '  /nametag save <name> <text>  save that template under the name and use it',
   '  /nametag delete <name>    forget a saved template',
+  '  /nametag topic <text>     set what this session is about (topic auto: from the next prompt; topic off: none)',
+  '  /nametag sigil <emoji>    pick the emoji for this folder (sigil auto: back to the one it was given)',
   '  /nametag force            tag this session for the folder the shell is in now, even a resumed or renamed one',
   '  /nametag color <c>        auto (per folder), off, or one of: ' + COLORS.join(', '),
   '  /nametag off [here]       stop naming new sessions (here = only in this folder)',
@@ -591,6 +696,8 @@ export const SUBCOMMANDS: readonly { name: string; description: string }[] = [
   { name: 'template', description: 'your own template; type { for the tokens' },
   { name: 'save', description: 'keep the template in use under a name' },
   { name: 'delete', description: 'forget a saved template' },
+  { name: 'topic', description: 'set what this session is about (auto, off)' },
+  { name: 'sigil', description: 'pick this folder emoji (auto)' },
   { name: 'force', description: 'tag this session for the folder you are in now' },
   { name: 'color', description: 'auto, off, or a fixed color' },
   { name: 'off', description: 'stop tagging new sessions (add "here" for this folder only)' },
@@ -743,6 +850,28 @@ export function parseArgs(args: string): Parsed {
     const template = tail.slice(rest[0]?.length ?? 0).trim()
 
     return { kind: 'save', name, template: template || null }
+  }
+
+  if (word === 'topic') {
+    const lower = tail.toLowerCase()
+
+    if (!tail) {
+      return { kind: 'topic', mode: 'show', text: '' }
+    }
+
+    if (lower === 'auto' || lower === 'off') {
+      return { kind: 'topic', mode: lower, text: '' }
+    }
+
+    return { kind: 'topic', mode: 'set', text: tail }
+  }
+
+  if (word === 'sigil') {
+    if (!tail) {
+      return { kind: 'error', text: 'Give an emoji, e.g. /nametag sigil 🦀, or auto' }
+    }
+
+    return { kind: 'sigil', emoji: tail.toLowerCase() === 'auto' ? null : tail }
   }
 
   if (word === 'delete' || word === 'remove') {

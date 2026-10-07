@@ -37,6 +37,7 @@ branch only shows inside git.
 |---|---|
 | `compact` | `hess-laundry #2` |
 | `branch` | `hess-laundry/fix/backfill #2` |
+| `status` | `🧺 hess-laundry/fix/backfill* ↑2 #2 · fix the backfill script` |
 | `host` | `hess-laundry/fix/backfill #2 @ LUIS-DESKTOP` |
 | `model` | `[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP` |
 | `timed` | `[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP Wed 9:05 am` |
@@ -45,7 +46,7 @@ branch only shows inside git.
 ## Your own template
 
 ```
-/nametag template {folder}{/branch}{ #n}{ · time}
+/nametag template {folder}{/branch}{ #nth}{ · topic}
 ```
 
 Typing `/nametag ` shows the options as you type, and inside a template a
@@ -57,10 +58,18 @@ Typing `/nametag ` shows the options as you type, and inside a template a
 | `family` | Opus |
 | `folder` | hess-laundry (the repository, so worktrees and subfolders share it) |
 | `dir` | the folder the session started in |
+| `remote` | lperezmo/hess-laundry |
 | `branch` | fix/backfill |
-| `n` | 2 (hidden for the first session in a folder) |
+| `dirty` | `*` when there are uncommitted changes |
+| `ahead` | 2 (commits not pushed yet; hidden at 0) |
+| `lastcommit` | Fix the backfill script for… |
+| `nth` | 2 (hidden for the first session in a folder) |
 | `num` | 1 (always shown) |
 | `host` | LUIS-DESKTOP |
+| `topic` | fix the backfill script (from the first prompt, or `/nametag topic`) |
+| `codename` | brisk-otter (fixed for the session) |
+| `sigil` | 🧺 (an emoji per folder) |
+| `todaycount` | 7 (the 7th session started today on this machine) |
 | `datetime` | Wed Oct 7th, 2026 9:05 am |
 | `date` | Oct 7th, 2026 |
 | `day` | Wed |
@@ -72,7 +81,8 @@ Typing `/nametag ` shows the options as you type, and inside a template a
 The date tokens are when the session started and never move, even when a
 branch switch renames it. The `updated` tokens are when the name last changed. Each
 `{...}` group is dropped when one of its tokens is empty, so `{/branch}`
-disappears outside git.
+disappears outside git. `dirty` and `ahead` rename the session when you edit,
+commit or push, so they leave a few more `/rename` lines than the others.
 
 ## Commands
 
@@ -85,6 +95,8 @@ disappears outside git.
 | `/nametag save <name> [text]` | Keep the template in use (or the one given) under a name |
 | `/nametag <name>` | Switch to a saved template |
 | `/nametag delete <name>` | Forget a saved template |
+| `/nametag topic <text>` | Set what this session is about; `auto` takes it from the next prompt, `off` clears it |
+| `/nametag sigil <emoji>` | Pick this folder's emoji; `auto` goes back to the one it was given |
 | `/nametag force` | Tag this session for the folder you are in now (after a `cd`), even a resumed or renamed one |
 | `/nametag color <c>` | `auto` (per folder), `off`, or a fixed color |
 | `/nametag off [here]` | Stop tagging new sessions, everywhere or in this folder |

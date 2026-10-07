@@ -52,7 +52,10 @@ import {
   type Config,
   type LiveEntry,
   type TagValues,
+  type Token,
+  usedTokens,
 } from './tag'
+import { codenameFor, dayKey, parseGitStatus, remoteSlug, shorten, sigilFor, topicFrom, type GitState } from './extras'
 
 const COMMAND_NAME = 'nametag'
 
@@ -109,6 +112,8 @@ async function others($: EngineInterface, selfId: string): Promise<LiveEntry[]> 
       if (!seen || now - seen.at > SEEN_TTL_MS) {
         await $.store.delete(key)
       }
+    } else if (key.startsWith('day.') && key !== dayKey(now)) {
+      await $.store.delete(key)
     }
   }
 
@@ -164,28 +169,37 @@ async function repoTop($: EngineInterface, cwd: string): Promise<string> {
 }
 
 /**
- * The checked-out branch, or the short commit when detached; empty outside git.
+ * Branch, uncommitted changes and unpushed commits in one git call; all empty
+ * outside git.
  *
  * @param $ the engine interface
  * @param cwd where to ask
  */
-async function branchName($: EngineInterface, cwd: string): Promise<string> {
+async function gitState($: EngineInterface, cwd: string): Promise<GitState> {
   try {
-    const run = await $.process.run(['git', 'branch', '--show-current'], { cwd, timeoutMs: GIT_TIMEOUT_MS })
+    const run = await $.process.run(['git', 'status', '--porcelain=v2', '--branch'], { cwd, timeoutMs: GIT_TIMEOUT_MS })
 
-    if (run.exitCode !== 0) {
-      return ''
-    }
+    return run.exitCode === 0 ? parseGitStatus(run.stdout) : { branch: '', isDirty: false, ahead: 0 }
+  } catch {
+    return { branch: '', isDirty: false, ahead: 0 }
+  }
+}
 
-    const branch = run.stdout.trim()
+/**
+ * The origin remote's URL, or the last commit's subject: one line of git
+ * output, empty when git has none.
+ *
+ * @param $ the engine interface
+ * @param cwd where to ask
+ * @param what which line
+ */
+async function gitLine($: EngineInterface, cwd: string, what: 'remote' | 'lastcommit'): Promise<string> {
+  try {
+    const run = what === 'remote'
+      ? await $.process.run(['git', 'remote', 'get-url', 'origin'], { cwd, timeoutMs: GIT_TIMEOUT_MS })
+      : await $.process.run(['git', 'log', '-1', '--format=%s'], { cwd, timeoutMs: GIT_TIMEOUT_MS })
 
-    if (branch) {
-      return branch
-    }
-
-    const head = await $.process.run(['git', 'rev-parse', '--short', 'HEAD'], { cwd, timeoutMs: GIT_TIMEOUT_MS })
-
-    return head.exitCode === 0 ? head.stdout.trim() : ''
+    return run.exitCode === 0 ? run.stdout.trim() : ''
   } catch {
     return ''
   }
@@ -200,8 +214,13 @@ async function branchName($: EngineInterface, cwd: string): Promise<string> {
  * @param n the instance number
  * @param at the folder to name it after; absent, the folder /nametag force
  *   pinned, else the folder the session started in
+ * @param isAll work out every token, not only the ones the template uses
+ *   (the presets preview)
  */
-async function values($: EngineInterface, n: number, at?: string): Promise<{ v: TagValues; key: string }> {
+async function values($: EngineInterface, n: number, at?: string, isAll = false): Promise<{ v: TagValues; key: string }> {
+  const config = await readConfig($)
+  const used = usedTokens(resolveTemplate(config.template, config.saved))
+  const wants = (...tokens: Token[]) => isAll || tokens.some((t) => used.has(t))
   const root = at ?? me?.root ?? (await $.session.root())
   const repo = await $.session.repo()
   // The repository follows the shell's current folder, which moves when a
@@ -223,18 +242,37 @@ async function values($: EngineInterface, n: number, at?: string): Promise<{ v: 
     fixed = { host: await hostName($), startedAt: (await $.session.usage()).startedAt }
   }
 
+  const key = folderKey(project)
+  const git = inRepo && wants('branch', 'dirty', 'ahead') ? await gitState($, root) : { branch: '', isDirty: false, ahead: 0 }
+  let remote = ''
+
+  if (inRepo && wants('remote')) {
+    // The engine's remote is for the shell's repository; trust it only when that is this one.
+    const url = repo && folderKey(repo.root) === key && repo.remote ? repo.remote : await gitLine($, root, 'remote')
+
+    remote = url ? remoteSlug(url) : ''
+  }
+
   const v: TagValues = {
     model: modelLabel(await $.session.model()),
     folder: baseName(project),
     dir: baseName(root),
-    branch: inRepo ? await branchName($, root) : '',
+    branch: git.branch,
+    isDirty: git.isDirty,
+    ahead: git.ahead,
+    remote,
+    lastcommit: inRepo && wants('lastcommit') ? shorten(await gitLine($, root, 'lastcommit'), 40) : '',
     n,
     host: fixed.host,
     startedAt: fixed.startedAt,
     updatedAt: me?.updatedAt ?? fixed.startedAt,
+    topic: me?.topic ?? '',
+    codename: me?.codename ?? codenameFor(await $.session.id()),
+    sigil: sigilFor(key, config.sigils),
+    today: me?.today ?? 0,
   }
 
-  return { v, key: folderKey(project) }
+  return { v, key }
 }
 
 /**
@@ -302,7 +340,7 @@ async function claim($: EngineInterface, id: string, key: string, config: Config
   let live = await others($, id)
   const picked = assign(key, live, config.color)
   const isFree = preferN !== undefined && !live.some((o) => o.key === key && o.n === preferN)
-  const entry: LiveEntry = { id, key, n: isFree ? preferN : picked.n, color: keep === undefined ? picked.color : keep, at: now, title: null, isManual: false }
+  const entry: LiveEntry = { id, key, n: isFree ? preferN : picked.n, color: keep === undefined ? picked.color : keep, at: now, title: null, isManual: false, codename: codenameFor(id) }
 
   await save($, entry)
 
@@ -318,6 +356,21 @@ async function claim($: EngineInterface, id: string, key: string, config: Config
   }
 
   return entry
+}
+
+/**
+ * Counts this session among the ones started today on this machine.
+ *
+ * @param $ the engine interface
+ */
+async function countToday($: EngineInterface): Promise<number> {
+  const key = dayKey(await $.clock.now())
+  const before = await $.store.get(key)
+  const count = (typeof before === 'number' ? before : 0) + 1
+
+  await $.store.set(key, count)
+
+  return count
 }
 
 /**
@@ -337,10 +390,12 @@ async function tagAtStart($: EngineInterface) {
   }
 
   const seen = asSeen(await $.store.get(`${SEEN_PREFIX}${id}`))
+  // A resume (a /relaunch) keeps its place in today's count; anything else takes the next one.
+  const today = seen?.today ?? (await countToday($))
 
   if (seen) {
     me = await claim($, id, key, config, seen.color, seen.n)
-    me = { ...me, title: seen.title, isManual: seen.isManual, ...(seen.updatedAt ? { updatedAt: seen.updatedAt } : {}), ...(seen.root ? { root: seen.root } : {}) }
+    me = { ...me, today, ...(seen.codename ? { codename: seen.codename } : {}), ...(seen.topic ? { topic: seen.topic } : {}), ...(seen.isTopicSet ? { isTopicSet: true } : {}), title: seen.title, isManual: seen.isManual, ...(seen.updatedAt ? { updatedAt: seen.updatedAt } : {}), ...(seen.root ? { root: seen.root } : {}) }
 
     const { v } = await values($, me.n)
     let title = me.isManual ? null : render(resolveTemplate(config.template, config.saved), v)
@@ -364,13 +419,13 @@ async function tagAtStart($: EngineInterface) {
     // its name and color may be the person's own, and neither can be read, so
     // leave both. It still holds a number; /nametag force tags it.
     me = await claim($, id, key, config, null)
-    me = { ...me, isManual: true }
+    me = { ...me, isManual: true, today }
     await save($, me)
 
     return
   }
 
-  me = await claim($, id, key, config)
+  me = { ...(await claim($, id, key, config)), today }
 
   const { v } = await values($, me.n)
   const title = render(resolveTemplate(config.template, config.saved), v)
@@ -468,7 +523,7 @@ async function applyNow($: EngineInterface, isPin = false): Promise<string> {
  */
 async function retire($: EngineInterface, entry: LiveEntry) {
   await $.store.delete(`${LIVE_PREFIX}${entry.id}`)
-  await $.store.set(`${SEEN_PREFIX}${entry.id}`, { id: entry.id, n: entry.n, color: entry.color, title: entry.title, isManual: entry.isManual, at: await $.clock.now(), updatedAt: entry.updatedAt, root: entry.root })
+  await $.store.set(`${SEEN_PREFIX}${entry.id}`, { id: entry.id, n: entry.n, color: entry.color, title: entry.title, isManual: entry.isManual, at: await $.clock.now(), updatedAt: entry.updatedAt, root: entry.root, topic: entry.topic, isTopicSet: entry.isTopicSet, codename: entry.codename, today: entry.today })
 }
 
 /**
@@ -568,6 +623,24 @@ export function register(on: On) {
     return mine.length ? { suggestions: [...result.suggestions, ...mine] } : result
   })
 
+  // The topic, when not set by hand: the first prompt that has one. The
+  // rename follows at the end of that turn with the rest.
+  on('prompt.submit', async ($, e, next) => {
+    const result = await next(e)
+    const kind = e.origin?.kind
+
+    if (me && !me.topic && !me.isTopicSet && (kind === 'composer' || kind === 'bridge')) {
+      const topic = topicFrom(e.text)
+
+      if (topic) {
+        me = { ...me, topic }
+        await save($, me)
+      }
+    }
+
+    return result
+  })
+
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
 
@@ -615,7 +688,7 @@ export function register(on: On) {
       case 'error':
         return { text: parsed.text }
       case 'presets': {
-        const { v } = await values($, me?.n ?? 1)
+        const { v } = await values($, me?.n ?? 1, undefined, true)
         const config = await readConfig($)
         const names = [...PRESET_ORDER, ...Object.keys(config.saved).sort()]
         const width = Math.max(8, ...names.map((name) => name.length))
@@ -664,6 +737,39 @@ export function register(on: On) {
         }
 
         return { text: `${isNew ? 'Saved' : 'Updated'} "${parsed.name}": ${text}. /nametag ${parsed.name} brings it back.` }
+      }
+      case 'topic': {
+        if (!me) {
+          return { text: 'This session is not tagged. /nametag force tags it.' }
+        }
+
+        if (parsed.mode === 'show') {
+          return { text: me.topic ? `Topic: ${me.topic}` : 'No topic yet. /nametag topic <text> sets one.' }
+        }
+
+        me = parsed.mode === 'set'
+          ? { ...me, topic: shorten(parsed.text, 40), isTopicSet: true }
+          : { ...me, topic: '', isTopicSet: parsed.mode === 'off' }
+        await save($, me)
+        await refresh($)
+
+        return { text: parsed.mode === 'set' ? `Topic: ${me.topic}` : parsed.mode === 'auto' ? 'The next prompt sets the topic.' : 'No topic for this session.' }
+      }
+      case 'sigil': {
+        const config = await readConfig($)
+        const { key } = await values($, me?.n ?? 1)
+        const sigils = { ...config.sigils }
+
+        if (parsed.emoji) {
+          sigils[key] = parsed.emoji
+        } else {
+          delete sigils[key]
+        }
+
+        await $.store.set(CONFIG_KEY, { ...config, sigils })
+        await refresh($)
+
+        return { text: `This folder's emoji: ${sigilFor(key, sigils)}` }
       }
       case 'delete': {
         const config = await readConfig($)

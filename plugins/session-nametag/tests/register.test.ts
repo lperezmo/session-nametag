@@ -2,6 +2,7 @@ import type { On } from 'claude-code'
 import { describe, expect, mock, test, tier } from 'claude-code/testing'
 import type { Engine } from 'claude-code/testing'
 
+import { dayKey } from '../hooks/extras'
 import { CONFIG_KEY, LIVE_PREFIX, SEEN_PREFIX, STALE_MS } from '../hooks/tag'
 
 tier('user')
@@ -20,7 +21,7 @@ type World = {
   /** Every command the mod ran (/color, /rename), as `name args`. */
   ran: string[]
   /** What the fake session answers; a test changes it between calls. */
-  session: { branch: string; turns: number; model: string; id: string; cwd: string; repoRoot: string }
+  session: { branch: string; turns: number; model: string; id: string; cwd: string; repoRoot: string; status: string }
   clock: ReturnType<typeof mock.clock>
 }
 
@@ -30,7 +31,7 @@ type World = {
  */
 function world(on: On, opts: { stored?: Record<string, unknown>; env?: Record<string, string>; turns?: number; repoRoot?: string } = {}): World {
   const ran: string[] = []
-  const session = { branch: 'fix/backfill', turns: opts.turns ?? 0, model: 'claude-opus-5-5', id: 'sess-b', cwd: ROOT, repoRoot: opts.repoRoot ?? ROOT }
+  const session = { branch: 'fix/backfill', turns: opts.turns ?? 0, model: 'claude-opus-5-5', id: 'sess-b', cwd: ROOT, repoRoot: opts.repoRoot ?? ROOT, status: '' }
   const store = new Map<string, unknown>(Object.entries(opts.stored ?? {}))
 
   on('session.start', ($, e) => ({ cwd: e.cwd }))
@@ -54,7 +55,15 @@ function world(on: On, opts: { stored?: Record<string, unknown>; env?: Record<st
       return top ? answer(0, `${top}\n`) : answer(128, '')
     }
 
-    return answer(0, e.argv.includes('--show-current') ? `${session.branch}\n` : 'abc1234\n')
+    if (e.argv.includes('status')) {
+      return answer(0, `# branch.oid abc1234def\n# branch.head ${session.branch}\n${session.status}`)
+    }
+
+    if (e.argv.includes('get-url')) {
+      return answer(0, 'git@github.com:lperezmo/hess-laundry.git\n')
+    }
+
+    return answer(0, e.argv.includes('log') ? 'Fix the backfill script for old rows\n' : 'abc1234\n')
   })
   on('command.run', ($, e) => {
     ran.push(`${e.command} ${e.args}`)
@@ -62,6 +71,7 @@ function world(on: On, opts: { stored?: Record<string, unknown>; env?: Record<st
     return { text: '' }
   })
   on('turn.complete', () => ({ text: '' }))
+  on('prompt.submit', ($, e) => ({ text: e.text }))
   on('ui.log', () => ({ value: undefined }))
   on('store.get', ($, e) => ({ value: store.get(e.key) }))
   on('store.set', ($, e) => {
@@ -210,6 +220,70 @@ describe('force', () => {
     await w.clock.advance(1000)
 
     expect(w.ran.filter((r) => r.startsWith('rename')).pop()).toBe(forced)
+  })
+})
+
+describe('new tokens', () => {
+  const STATUS = { [CONFIG_KEY]: { template: 'status', color: 'off', isOn: true, offFolders: [] } }
+  const lastRename = (w: World) => w.ran.filter((r) => r.startsWith('rename')).pop()
+  const turn = (id: string) => ({ answer: '', durationMs: 1, isAborted: false, turnId: id, reason: 'answer' }) as never
+
+  test('the first prompt sets the topic, renamed after that turn', async ($, on) => {
+    const w = world(on, { stored: STATUS })
+
+    await start($, w)
+    await $.prompt.submit({ text: 'hey can you fix the backfill script', origin: TYPED, wait: false } as never)
+    await $.turn.complete(turn('t1'))
+    await w.clock.advance(1000)
+
+    expect(lastRename(w)).toMatch(/hess-laundry\/fix\/backfill · fix the backfill script$/)
+
+    // A later prompt does not change it.
+    await $.prompt.submit({ text: 'now something else entirely', origin: TYPED, wait: false } as never)
+    await $.turn.complete(turn('t2'))
+    await w.clock.advance(1000)
+    expect(lastRename(w)).toMatch(/fix the backfill script$/)
+  })
+
+  test('/nametag topic sets, auto waits for the next prompt, off clears', async ($, on) => {
+    const w = world(on, { stored: STATUS })
+    const run = (args: string) => $.command.run({ command: 'nametag', args, origin: TYPED } as never)
+
+    await start($, w)
+    expect((await run('topic Laundry Backfill')).text).toBe('Topic: Laundry Backfill')
+    await w.clock.advance(1000)
+    expect(lastRename(w)).toMatch(/· Laundry Backfill$/)
+
+    await $.prompt.submit({ text: 'fix the thing', origin: TYPED, wait: false } as never)
+    await $.turn.complete(turn('t1'))
+    await w.clock.advance(1000)
+    expect(lastRename(w)).toMatch(/· Laundry Backfill$/)
+
+    await run('topic off')
+    await w.clock.advance(1000)
+    expect(lastRename(w)).toMatch(/hess-laundry\/fix\/backfill$/)
+  })
+
+  test('uncommitted changes and unpushed commits show and clear', async ($, on) => {
+    const w = world(on, { stored: STATUS })
+
+    await start($, w)
+    w.session.status = '# branch.ab +2 -0\n1 .M N... 100644 100644 100644 a b x.ts\n'
+    await $.turn.complete(turn('t1'))
+    await w.clock.advance(1000)
+    expect(lastRename(w)).toMatch(/hess-laundry\/fix\/backfill\* ↑2$/)
+
+    w.session.status = ''
+    await $.turn.complete(turn('t2'))
+    await w.clock.advance(1000)
+    expect(lastRename(w)).toMatch(/hess-laundry\/fix\/backfill$/)
+  })
+
+  test('each session started today gets the next count', async ($, on) => {
+    const w = world(on, { stored: { [CONFIG_KEY]: { template: '{folder}{ #todaycount today}', color: 'off', isOn: true, offFolders: [] }, [dayKey(START)]: 6 } })
+
+    await start($, w)
+    expect(lastRename(w)).toBe('rename hess-laundry #7 today')
   })
 })
 

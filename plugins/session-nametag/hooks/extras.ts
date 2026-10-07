@@ -106,8 +106,8 @@ export function parseGitStatus(out: string): GitState {
 }
 
 /**
- * A remote URL as owner/name: `git@github.com:lperezmo/x.git`,
- * `https://github.com/lperezmo/x` and `ssh://host/a/b/x.git` all work.
+ * A remote URL as owner/name: scp style `git@host:owner/x.git`,
+ * `https://host/owner/x` and `ssh://host/a/owner/x.git` all work.
  *
  * @param url the remote's URL
  */
@@ -153,11 +153,11 @@ export const SIGILS = [
 /**
  * The folder's emoji: the one the person set for it, or the one its hash picks.
  *
- * @param key the folder key
+ * @param folder the folder key
  * @param chosen emoji the person set per folder key
  */
-export function sigilFor(key: string, chosen: Readonly<Record<string, string>> = {}): string {
-  return chosen[key] ?? SIGILS[hash(`sigil:${key}`) % SIGILS.length] ?? '📦'
+export function sigilFor(folder: string, chosen: Readonly<Record<string, string>> = {}): string {
+  return chosen[folder] ?? SIGILS[hash('sigil:' + folder) % SIGILS.length] ?? '📦'
 }
 
 /**

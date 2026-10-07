@@ -108,14 +108,34 @@ the project's `.claude/settings.json` `env`.
 
 ## What it does on your machine
 
-- Runs `/rename` and `/color` in the session. Each leaves one short line in
-  the transcript. A mod cannot set the name silently: the built-in security
+Nothing leaves your machine. The mod makes no network calls and sends no
+data anywhere; everything below stays local.
+
+- **Slash commands it runs:** `/rename` and `/color`, in this session only,
+  when the session starts, when the name changes (branch switch, `/model`,
+  topic, a `/nametag` command) and never otherwise. Each leaves one short line
+  in the transcript. A mod cannot set the name silently: the built-in security
   mod keeps classic hook events such as SessionStart away from installed mods.
-- Runs `git branch --show-current` in the session's folder, and `hostname`
-  only when no host name is in the environment.
-- Keeps a small record per session in the mod's own store on this machine:
-  session id, folder path, number, color, name, last heartbeat. Ended
-  sessions are forgotten after 30 days. Nothing leaves your machine.
+- **Programs it starts:** `git`, in the session's folder, to read the branch
+  and state: `git rev-parse --show-toplevel`, `git status --porcelain=v2
+  --branch`, and only when your template uses `remote` or `lastcommit`,
+  `git remote get-url origin` and `git log -1 --format=%s`. `hostname` runs
+  only when `COMPUTERNAME` / `HOSTNAME` are unset and `/etc/hostname` is
+  missing. Their output goes into the session name and nowhere else.
+- **What it reads:** the host name (`COMPUTERNAME`, `HOSTNAME` or
+  `/etc/hostname`), the `NAMETAG_OFF` variable, the session's folder, model
+  and start time, and the first prompt you type, from which it takes a few
+  words for the `topic` token. No tokens, keys or credentials.
+- **Hooks:** `session.start` registers `/nametag` and tags the session;
+  `turn.complete` re-checks git after each turn; `command.run` handles
+  `/nametag`, notices a manual `/rename` or `/color` and refreshes after
+  `/model`; `prompt.submit` only reads the first prompt for the topic and
+  passes it on unchanged; `prompt.autocomplete` adds `/nametag` options to the
+  typeahead; `session.end` keeps the name across `/clear` and `/relaunch`.
+- **What it stores:** a small record per session in the mod's own store on
+  this machine: session id, folder path, number, color, name, topic, last
+  heartbeat; plus your settings and saved templates. Ended sessions are
+  forgotten after 30 days.
 
 ## License
 

@@ -91,6 +91,7 @@ commit or push, so they leave a few more `/rename` lines than the others.
 | `/nametag` | This session's tag and the other live sessions |
 | `/nametag presets` | Preview every preset for this session |
 | `/nametag <preset>` | Use a preset from now on and rename this session |
+| `/nametag default` | Back to the default preset (`full`); `reset` works too |
 | `/nametag template <text>` | Use your own template |
 | `/nametag save <name> [text]` | Keep the template in use (or the one given) under a name |
 | `/nametag <name>` | Switch to a saved template |

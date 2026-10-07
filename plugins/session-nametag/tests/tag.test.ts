@@ -161,6 +161,9 @@ describe('parseArgs', () => {
     expect(parseArgs('template {folder}{/branch}')).toEqual({ kind: 'template', template: '{folder}{/branch}' })
     expect(parseArgs('{folder} #{num}')).toEqual({ kind: 'template', template: '{folder} #{num}' })
     expect(parseArgs('presets')).toEqual({ kind: 'presets' })
+    expect(parseArgs('default')).toEqual({ kind: 'preset', name: 'full' })
+    expect(parseArgs('reset')).toEqual({ kind: 'preset', name: 'full' })
+    expect(parseArgs('save default').kind).toBe('error')
   })
 
   test('force, color, off and on', () => {

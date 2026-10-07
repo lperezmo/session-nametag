@@ -356,7 +356,7 @@ export function resolveTemplate(template: string, saved: Readonly<Record<string,
 }
 
 /** Words a saved template may not be called: the presets and the options. */
-export const RESERVED = ['presets', 'list', 'preview', 'template', 'force', 'apply', 'now', 'color', 'colour', 'off', 'on', 'help', 'save', 'delete', 'remove', 'topic', 'sigil'] as const
+export const RESERVED = ['presets', 'list', 'preview', 'template', 'force', 'apply', 'now', 'color', 'colour', 'off', 'on', 'help', 'save', 'delete', 'remove', 'topic', 'sigil', 'default', 'reset'] as const
 
 /** How many saved templates the store keeps. */
 export const MAX_SAVED = 20
@@ -674,7 +674,8 @@ export const USAGE = [
   '  /nametag                  show this session\'s tag and the live sessions',
   '  /nametag presets          preview every preset for this session',
   `  /nametag <preset>         use a preset from now on: ${PRESET_ORDER.join(', ')}`,
-  '  /nametag template <text>  use your own template, e.g. {folder}{/branch}{ #n}',
+  `  /nametag default          back to the default preset (${DEFAULT_PRESET}); reset works too`,
+  '  /nametag template <text>  use your own template, e.g. {folder}{/branch}{ #nth}',
   '  /nametag save <name>      keep the template in use under a name; /nametag <name> brings it back',
   '  /nametag save <name> <text>  save that template under the name and use it',
   '  /nametag delete <name>    forget a saved template',
@@ -693,6 +694,7 @@ export const USAGE = [
 export const SUBCOMMANDS: readonly { name: string; description: string }[] = [
   { name: 'presets', description: 'preview every preset for this session' },
   ...PRESET_ORDER.map((name) => ({ name, description: `preset: ${PRESETS[name]}` })),
+  { name: 'default', description: `back to the default preset (${DEFAULT_PRESET})` },
   { name: 'template', description: 'your own template; type { for the tokens' },
   { name: 'save', description: 'keep the template in use under a name' },
   { name: 'delete', description: 'forget a saved template' },
@@ -804,6 +806,10 @@ export function parseArgs(args: string): Parsed {
 
   if (isPreset(word)) {
     return { kind: 'preset', name: word }
+  }
+
+  if (word === 'default' || word === 'reset') {
+    return { kind: 'preset', name: DEFAULT_PRESET }
   }
 
   if (word === 'template') {

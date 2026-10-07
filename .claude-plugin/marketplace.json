@@ -1,0 +1,19 @@
+{
+  "$schema": "https://json.schemastore.org/claude-code-marketplace.json",
+  "name": "session-nametag",
+  "owner": {
+    "name": "Luis Perez Morales",
+    "url": "https://github.com/lperezmo"
+  },
+  "metadata": {
+    "description": "session-nametag: a Claude Code mod that names and colors every session when it starts, so you can tell them apart."
+  },
+  "plugins": [
+    {
+      "name": "session-nametag",
+      "source": "./plugins/session-nametag",
+      "description": "Names each session from a template (folder, branch, instance number, machine, model, start time) and gives each folder its own color. /nametag picks the style.",
+      "category": "productivity"
+    }
+  ]
+}

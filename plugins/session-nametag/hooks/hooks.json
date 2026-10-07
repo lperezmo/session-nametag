@@ -1,0 +1,4 @@
+{
+  "description": "Names and colors each session at start from a template; /nametag picks presets, templates and colors",
+  "modules": ["./register.ts"]
+}

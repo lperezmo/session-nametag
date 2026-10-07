@@ -1,0 +1,12 @@
+{
+  "$schema": "https://anthropic.com/claude-code/plugin.schema.json",
+  "name": "session-nametag",
+  "version": "0.1.0",
+  "description": "Names and colors each Claude Code session when it starts (folder, branch, instance number, machine, model, start time), so many sessions are easy to tell apart. /nametag picks the style.",
+  "author": {
+    "name": "Luis Perez Morales"
+  },
+  "homepage": "https://github.com/lperezmo/session-nametag",
+  "repository": "https://github.com/lperezmo/session-nametag",
+  "license": "MIT"
+}

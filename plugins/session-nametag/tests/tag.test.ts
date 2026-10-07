@@ -10,6 +10,7 @@ import {
   modelLabel,
   mustYield,
   ordinal,
+  suggest,
   updatedLabel,
   parseArgs,
   pickColor,
@@ -33,7 +34,6 @@ const V: TagValues = {
   branch: 'fix/backfill',
   n: 2,
   host: 'LUIS-DESKTOP',
-  user: 'luis',
   startedAt: START,
   updatedAt: START,
 }
@@ -166,3 +166,40 @@ describe('parseArgs', () => {
     expect(parseArgs('bogus').kind).toBe('error')
   })
 })
+
+describe('typeahead', () => {
+  const at = (text: string) => {
+    const token = text.split(' ').pop() ?? ''
+
+    return suggest(text, token, text.length - token.length)
+  }
+
+  test('the options after /nametag', () => {
+    expect(at('/nametag c').map((s) => s.text)).toEqual(['compact', 'color'])
+    expect(at('/nametag t').map((s) => s.text)).toEqual(['timed', 'template'])
+  })
+
+  test('colors and here', () => {
+    expect(at('/nametag color p').map((s) => s.text)).toEqual(['purple', 'pink'])
+    expect(at('/nametag off h').map((s) => s.text)).toEqual(['here'])
+  })
+
+  test('a { lists every token, and narrows as you type', () => {
+    const all = at('/nametag template {')
+
+    expect(all.length).toBeGreaterThan(12)
+    expect(all[0]?.label).toBe('{[model] }')
+    expect(at('/nametag template {folder}{/b').map((s) => s.text)).toEqual(['{folder}{/branch}'])
+    expect(at('/nametag template {fa').map((s) => s.label)).toEqual(['{[family] }', '{family}'])
+  })
+
+  test('nothing outside /nametag or on the command word itself', () => {
+    expect(at('hello {')).toEqual([])
+    expect(at('/nametag')).toEqual([])
+  })
+
+  test('family is the model without its version', () => {
+    expect(render('{family}', V)).toBe('Opus')
+  })
+})
+

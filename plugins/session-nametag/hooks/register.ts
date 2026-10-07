@@ -45,6 +45,7 @@ import {
   resolveTemplate,
   SEEN_PREFIX,
   SEEN_TTL_MS,
+  suggest,
   USAGE,
   type Config,
   type LiveEntry,
@@ -68,8 +69,8 @@ let me: LiveEntry | null = null
 
 let isHeartbeat = false
 
-/** Host and user never change mid-session, so they are read once. */
-let fixed: { host: string; user: string; startedAt: number } | null = null
+/** The host and the start time never change mid-session, so they are read once. */
+let fixed: { host: string; startedAt: number } | null = null
 
 async function readConfig($: EngineInterface): Promise<Config> {
   return asConfig(await $.store.get(CONFIG_KEY))
@@ -186,9 +187,7 @@ async function values($: EngineInterface, n: number): Promise<{ v: TagValues; ke
   const project = repo?.root ?? root
 
   if (!fixed) {
-    const user = (await $.env.get('USERNAME')) ?? (await $.env.get('USER')) ?? ''
-
-    fixed = { host: await hostName($), user: user.trim(), startedAt: (await $.session.usage()).startedAt }
+    fixed = { host: await hostName($), startedAt: (await $.session.usage()).startedAt }
   }
 
   const v: TagValues = {
@@ -198,7 +197,6 @@ async function values($: EngineInterface, n: number): Promise<{ v: TagValues; ke
     branch: repo ? await branchName($, root) : '',
     n,
     host: fixed.host,
-    user: fixed.user,
     startedAt: fixed.startedAt,
     updatedAt: me?.updatedAt ?? fixed.startedAt,
   }
@@ -496,6 +494,15 @@ export function register(on: On) {
     })
 
     return result
+  })
+
+  // The typeahead under the prompt while /nametag is typed: options, colors,
+  // and the template tokens once a { is typed.
+  on('prompt.autocomplete', async ($, e, next) => {
+    const result = await next(e)
+    const mine = suggest(e.text, e.token, e.start)
+
+    return mine.length ? { suggestions: [...result.suggestions, ...mine] } : result
   })
 
   on('turn.complete', async ($, e, next) => {

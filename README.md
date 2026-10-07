@@ -46,14 +46,29 @@ branch only shows inside git.
 /nametag template {folder}{/branch}{ #n}{ · time}
 ```
 
-Tokens: `model`, `folder` (the repository, so worktrees and subfolders share
-it), `dir` (the folder the session started in), `branch`, `n` (hidden for the
-first session), `num` (always shown), `host`, `user`, `datetime`, `date`,
-`day`, `time`, `updated`. The date tokens are when the session started and
-never move, even when a branch switch renames it. `updated` is when the name
-last changed (`2:14 pm`, or `Thu 2:14 pm` on a later day). Each `{...}` group
-is dropped when one of its tokens is empty, so `{/branch}` disappears outside
-git.
+Typing `/nametag ` shows the options as you type, and inside a template a
+`{` lists every token.
+
+| Token | Example |
+|---|---|
+| `model` | Opus 5.5 |
+| `family` | Opus |
+| `folder` | hess-laundry (the repository, so worktrees and subfolders share it) |
+| `dir` | the folder the session started in |
+| `branch` | fix/backfill |
+| `n` | 2 (hidden for the first session in a folder) |
+| `num` | 1 (always shown) |
+| `host` | LUIS-DESKTOP |
+| `datetime` | Wed Oct 7th, 2026 9:05 am |
+| `date` | Oct 7th, 2026 |
+| `day` | Wed |
+| `time` | 9:05 am |
+| `updated` | 2:14 pm, or Thu 2:14 pm on a later day |
+
+The date tokens are when the session started and never move, even when a
+branch switch renames it. `updated` is when the name last changed. Each
+`{...}` group is dropped when one of its tokens is empty, so `{/branch}`
+disappears outside git.
 
 ## Commands
 

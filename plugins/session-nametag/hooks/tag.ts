@@ -60,7 +60,6 @@ export type TagValues = {
   /** The instance number among live sessions in the same folder, from 1. */
   n: number
   host: string
-  user: string
   /** When the session first started, in epoch milliseconds. */
   startedAt: number
   /** When the name last changed for a reason other than this time itself. */
@@ -68,7 +67,36 @@ export type TagValues = {
 }
 
 /** The token names a template may use. */
-export const TOKENS = ['model', 'folder', 'dir', 'branch', 'num', 'n', 'host', 'user', 'datetime', 'date', 'day', 'time', 'updated'] as const
+export const TOKENS = ['model', 'family', 'folder', 'dir', 'branch', 'num', 'n', 'host', 'datetime', 'date', 'day', 'time', 'updated'] as const
+
+export type Token = (typeof TOKENS)[number]
+
+/** What each token is, for /nametag help and the typeahead. */
+export const TOKEN_HELP: Record<Token, string> = {
+  model: 'model and version, e.g. Opus 5.5',
+  family: 'model without the version, e.g. Opus',
+  folder: 'the repository (worktrees and subfolders share it)',
+  dir: 'the folder the session started in',
+  branch: 'git branch; the group hides outside git',
+  n: 'instance number; hidden for the first session in a folder',
+  num: 'instance number, always shown',
+  host: 'this machine\'s name',
+  datetime: 'session start, e.g. Wed Oct 7th, 2026 9:05 am',
+  date: 'session start date, e.g. Oct 7th, 2026',
+  day: 'session start weekday, e.g. Wed',
+  time: 'session start time, e.g. 9:05 am',
+  updated: 'when the name last changed, e.g. 2:14 pm',
+}
+
+/** Groups with their usual punctuation, offered first in the typeahead. */
+export const SNIPPETS: readonly { text: string; token: Token }[] = [
+  { text: '{[model] }', token: 'model' },
+  { text: '{[family] }', token: 'family' },
+  { text: '{/branch}', token: 'branch' },
+  { text: '{ #n}', token: 'n' },
+  { text: '{ @ host}', token: 'host' },
+  { text: '{ · updated}', token: 'updated' },
+]
 
 const TOKEN_RE = new RegExp(`(?<![A-Za-z])(${TOKENS.join('|')})(?![A-Za-z])`, 'g')
 
@@ -199,7 +227,7 @@ export function render(template: string, v: TagValues): string {
       case 'n': return v.n > 1 ? String(v.n) : ''
       case 'num': return String(v.n)
       case 'host': return v.host
-      case 'user': return v.user
+      case 'family': return v.model.split(' ')[0] ?? ''
       case 'datetime': return when.datetime
       case 'date': return when.date
       case 'day': return when.day
@@ -472,8 +500,87 @@ export const USAGE = [
   '  /nametag color <c>        auto (per folder), off, or one of: ' + COLORS.join(', '),
   '  /nametag off [here]       stop naming new sessions (here = only in this folder)',
   '  /nametag on [here]        start again',
-  `Tokens: ${TOKENS.join(', ')}. The date tokens are when the session started; updated is when the name last changed. A {group} with an empty token disappears, so {/branch} hides outside git and { #n} hides for the first session in a folder.`,
+  'Tokens (type { after /nametag template to pick one):',
+  ...TOKENS.map((t) => `  ${t.padEnd(9)} ${TOKEN_HELP[t]}`),
+  'A {group} with an empty token disappears, so {/branch} hides outside git and { #n} hides for the first session in a folder.',
 ].join('\n')
+
+/** The first word after /nametag, with what it does, for the typeahead. */
+export const SUBCOMMANDS: readonly { name: string; description: string }[] = [
+  { name: 'presets', description: 'preview every preset for this session' },
+  ...PRESET_ORDER.map((name) => ({ name, description: `preset: ${PRESETS[name]}` })),
+  { name: 'template', description: 'your own template; type { for the tokens' },
+  { name: 'force', description: 'rename and recolor this session now' },
+  { name: 'color', description: 'auto, off, or a fixed color' },
+  { name: 'off', description: 'stop tagging new sessions (add "here" for this folder only)' },
+  { name: 'on', description: 'start tagging again (add "here" for this folder only)' },
+  { name: 'help', description: 'commands and tokens' },
+]
+
+export type Suggestion = { text: string; label?: string; description?: string }
+
+const COMMAND_PREFIX = '/nametag '
+
+/**
+ * The typeahead rows for the word at the cursor while /nametag is typed: its
+ * options first, a color or "here" after the option that takes one, and in a
+ * template the tokens as soon as a `{` is typed.
+ *
+ * @param text the whole prompt box
+ * @param token the run of non-space characters that ends at the cursor
+ * @param start where that run begins in `text`
+ */
+export function suggest(text: string, token: string, start: number): Suggestion[] {
+  if (!text.toLowerCase().startsWith(COMMAND_PREFIX) || start < COMMAND_PREFIX.length) {
+    return []
+  }
+
+  const words = text.slice(COMMAND_PREFIX.length, start).trim().split(/\s+/).filter(Boolean).map((w) => w.toLowerCase())
+  const typed = token.toLowerCase()
+  const brace = token.lastIndexOf('{')
+
+  if (brace >= 0 && (words.length === 0 || words[0] === 'template')) {
+    const before = token.slice(0, brace)
+    const partial = token.slice(brace + 1).toLowerCase()
+    const letters = partial.replace(/[^a-z]/g, '')
+    const rows: Suggestion[] = []
+
+    for (const s of SNIPPETS) {
+      if (s.text.toLowerCase().startsWith(`{${partial}`) || (letters && s.token.startsWith(letters))) {
+        rows.push({ text: before + s.text, label: s.text, description: TOKEN_HELP[s.token] })
+      }
+    }
+
+    // Punctuation typed after the { asks for a group like {/branch}; plain
+    // tokens only follow letters.
+    const isPlain = partial === letters
+
+    for (const t of TOKENS) {
+      if (isPlain && t.startsWith(letters) && !rows.some((r) => r.label === `{${t}}`)) {
+        rows.push({ text: `${before}{${t}}`, label: `{${t}}`, description: TOKEN_HELP[t] })
+      }
+    }
+
+    return rows
+  }
+
+  if (words.length === 0) {
+    return SUBCOMMANDS.filter((c) => c.name.startsWith(typed)).map((c) => ({ text: c.name, description: c.description }))
+  }
+
+  if (words.length === 1 && (words[0] === 'color' || words[0] === 'colour')) {
+    return ['auto', 'off', ...COLORS].filter((c) => c.startsWith(typed)).map((c) => ({
+      text: c,
+      description: c === 'auto' ? 'each folder its own color' : c === 'off' ? 'leave colors alone' : 'every session this color',
+    }))
+  }
+
+  if (words.length === 1 && (words[0] === 'off' || words[0] === 'on') && 'here'.startsWith(typed)) {
+    return [{ text: 'here', description: 'only sessions in this folder' }]
+  }
+
+  return []
+}
 
 /**
  * Reads what followed `/nametag`.

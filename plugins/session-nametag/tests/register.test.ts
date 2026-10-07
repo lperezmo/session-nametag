@@ -20,7 +20,7 @@ type World = {
   /** Every command the mod ran (/color, /rename), as `name args`. */
   ran: string[]
   /** What the fake session answers; a test changes it between calls. */
-  session: { branch: string; turns: number; model: string; id: string }
+  session: { branch: string; turns: number; model: string; id: string; cwd: string; repoRoot: string }
   clock: ReturnType<typeof mock.clock>
 }
 
@@ -30,7 +30,7 @@ type World = {
  */
 function world(on: On, opts: { stored?: Record<string, unknown>; env?: Record<string, string>; turns?: number; repoRoot?: string } = {}): World {
   const ran: string[] = []
-  const session = { branch: 'fix/backfill', turns: opts.turns ?? 0, model: 'claude-opus-5-5', id: 'sess-b' }
+  const session = { branch: 'fix/backfill', turns: opts.turns ?? 0, model: 'claude-opus-5-5', id: 'sess-b', cwd: ROOT, repoRoot: opts.repoRoot ?? ROOT }
   const store = new Map<string, unknown>(Object.entries(opts.stored ?? {}))
 
   on('session.start', ($, e) => ({ cwd: e.cwd }))
@@ -38,13 +38,24 @@ function world(on: On, opts: { stored?: Record<string, unknown>; env?: Record<st
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('session.id', () => ({ value: session.id }))
   on('session.root', () => ({ value: ROOT }))
-  on('session.repo', () => ({ value: { root: opts.repoRoot ?? ROOT, remote: null, internal: false, name: null } }))
+  on('session.repo', () => ({ value: { root: session.repoRoot, remote: null, internal: false, name: null } }))
+  on('session.cwd', () => ({ value: session.cwd }))
   on('session.model', () => ({ value: session.model }))
   on('session.turns', () => ({ value: session.turns }))
   on('session.usage', () => ({ value: { startedAt: START } as never }))
-  on('process.run', ($, e) => ({
-    value: { exitCode: 0, stdout: e.argv.includes('--show-current') ? `${session.branch}\n` : 'abc1234\n', stderr: '', isStdoutTruncated: false, isStderrTruncated: false } as never,
-  }))
+  on('process.run', ($, e) => {
+    const answer = (exitCode: number, stdout: string) => ({ value: { exitCode, stdout, stderr: '', isStdoutTruncated: false, isStderrTruncated: false } as never })
+
+    if (e.argv.includes('--show-toplevel')) {
+      // Two repositories exist: hess-laundry and session-nametag.
+      const where = (e.init?.cwd ?? '').replace(/\\/g, '/').toLowerCase()
+      const top = ['d:/python/hess-laundry', 'd:/python/session-nametag'].find((r) => where === r || where.startsWith(`${r}/`))
+
+      return top ? answer(0, `${top}\n`) : answer(128, '')
+    }
+
+    return answer(0, e.argv.includes('--show-current') ? `${session.branch}\n` : 'abc1234\n')
+  })
   on('command.run', ($, e) => {
     ran.push(`${e.command} ${e.args}`)
 
@@ -165,7 +176,7 @@ describe('folders', () => {
 
     await start($, w)
 
-    expect(w.ran[0]).toBe('rename [Opus 5.5] hess-laundry @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am')
+    expect(w.ran[0]).toBe('rename [Opus 5.5] hess-laundry/fix/backfill @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am')
   })
 
   test('a session started in a subfolder is named after its repository', async ($, on) => {
@@ -174,6 +185,31 @@ describe('folders', () => {
     await start($, w)
 
     expect(w.ran[0]).toBe('rename [Opus 5.5] Python/fix/backfill @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am')
+  })
+})
+
+describe('force', () => {
+  test('/nametag force follows the shell into another repository and stays there', async ($, on) => {
+    const w = world(on)
+
+    await start($, w)
+    w.session.cwd = 'D:/Python/session-nametag'
+    w.session.repoRoot = 'D:/Python/session-nametag'
+    w.session.branch = 'main'
+    await $.command.run({ command: 'nametag', args: 'force', origin: TYPED } as never)
+    await w.clock.advance(1000)
+
+    const forced = w.ran.filter((r) => r.startsWith('rename')).pop()
+
+    expect(forced).toBe('rename [Opus 5.5] session-nametag/main @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am')
+
+    // A later cd elsewhere does not pull the name along.
+    w.session.cwd = ROOT
+    w.session.repoRoot = ROOT
+    await $.turn.complete({ answer: '', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+    await w.clock.advance(1000)
+
+    expect(w.ran.filter((r) => r.startsWith('rename')).pop()).toBe(forced)
   })
 })
 

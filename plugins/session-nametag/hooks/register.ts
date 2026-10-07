@@ -147,6 +147,22 @@ async function hostName($: EngineInterface): Promise<string> {
 }
 
 /**
+ * The top folder of the git repository holding a folder; empty outside git.
+ *
+ * @param $ the engine interface
+ * @param cwd the folder
+ */
+async function repoTop($: EngineInterface, cwd: string): Promise<string> {
+  try {
+    const run = await $.process.run(['git', 'rev-parse', '--show-toplevel'], { cwd, timeoutMs: GIT_TIMEOUT_MS })
+
+    return run.exitCode === 0 ? run.stdout.trim() : ''
+  } catch {
+    return ''
+  }
+}
+
+/**
  * The checked-out branch, or the short commit when detached; empty outside git.
  *
  * @param $ the engine interface
@@ -181,14 +197,26 @@ async function branchName($: EngineInterface, cwd: string): Promise<string> {
  *
  * @param $ the engine interface
  * @param n the instance number
+ * @param at the folder to name it after; absent, the folder /nametag force
+ *   pinned, else the folder the session started in
  */
-async function values($: EngineInterface, n: number): Promise<{ v: TagValues; key: string }> {
-  const root = await $.session.root()
+async function values($: EngineInterface, n: number, at?: string): Promise<{ v: TagValues; key: string }> {
+  const root = at ?? me?.root ?? (await $.session.root())
   const repo = await $.session.repo()
   // The repository follows the shell's current folder, which moves when a
   // tool cds somewhere; only one that holds the session's own folder counts.
-  const inRepo = repo !== null && isWithin(root, repo.root)
-  const project = inRepo ? repo.root : root
+  let inRepo = repo !== null && isWithin(root, repo.root)
+  let project = inRepo && repo ? repo.root : root
+
+  if (!inRepo) {
+    // The shell is somewhere else: ask git about the session's own folder.
+    const top = await repoTop($, root)
+
+    if (top) {
+      inRepo = true
+      project = top
+    }
+  }
 
   if (!fixed) {
     fixed = { host: await hostName($), startedAt: (await $.session.usage()).startedAt }
@@ -311,7 +339,7 @@ async function tagAtStart($: EngineInterface) {
 
   if (seen) {
     me = await claim($, id, key, config, seen.color, seen.n)
-    me = { ...me, title: seen.title, isManual: seen.isManual, ...(seen.updatedAt ? { updatedAt: seen.updatedAt } : {}) }
+    me = { ...me, title: seen.title, isManual: seen.isManual, ...(seen.updatedAt ? { updatedAt: seen.updatedAt } : {}), ...(seen.root ? { root: seen.root } : {}) }
 
     const { v } = await values($, me.n)
     let title = me.isManual ? null : render(resolveTemplate(config.template), v)
@@ -385,9 +413,26 @@ async function refresh($: EngineInterface) {
  *
  * @param $ the engine interface
  */
-async function applyNow($: EngineInterface): Promise<string> {
+async function applyNow($: EngineInterface, isPin = false): Promise<string> {
   const id = await $.session.id()
   const config = await readConfig($)
+
+  if (isPin) {
+    // /nametag force: follow the shell to wherever it is now, and keep the
+    // session there; later re-checks use this folder, not the starting one.
+    const here = await $.session.cwd()
+    const { key } = await values($, 1, here)
+
+    if (!me || me.key !== key) {
+      const live = await others($, id)
+      const picked = assign(key, live, config.color)
+      const color = me?.color && config.color !== 'auto' ? me.color : picked.color
+
+      me = me ? { ...me, key, n: picked.n, color } : await claim($, id, key, config)
+    }
+
+    me = { ...me, root: here }
+  }
 
   if (!me) {
     const { key } = await values($, 1)
@@ -419,7 +464,7 @@ async function applyNow($: EngineInterface): Promise<string> {
  */
 async function retire($: EngineInterface, entry: LiveEntry) {
   await $.store.delete(`${LIVE_PREFIX}${entry.id}`)
-  await $.store.set(`${SEEN_PREFIX}${entry.id}`, { id: entry.id, n: entry.n, color: entry.color, title: entry.title, isManual: entry.isManual, at: await $.clock.now(), updatedAt: entry.updatedAt })
+  await $.store.set(`${SEEN_PREFIX}${entry.id}`, { id: entry.id, n: entry.n, color: entry.color, title: entry.title, isManual: entry.isManual, at: await $.clock.now(), updatedAt: entry.updatedAt, root: entry.root })
 }
 
 /**
@@ -579,7 +624,7 @@ export function register(on: On) {
         return { text: `New sessions will be named like this one: ${title}` }
       }
       case 'apply': {
-        const title = await applyNow($)
+        const title = await applyNow($, true)
 
         return { text: `Tagged: ${title}` }
       }

@@ -80,7 +80,7 @@ disappears outside git.
 | `/nametag presets` | Preview every preset for this session |
 | `/nametag <preset>` | Use a preset from now on and rename this session |
 | `/nametag template <text>` | Use your own template |
-| `/nametag force` | Rename and recolor this session now, even a resumed or renamed one |
+| `/nametag force` | Tag this session for the folder you are in now (after a `cd`), even a resumed or renamed one |
 | `/nametag color <c>` | `auto` (per folder), `off`, or a fixed color |
 | `/nametag off [here]` | Stop tagging new sessions, everywhere or in this folder |
 | `/nametag on [here]` | Start again |

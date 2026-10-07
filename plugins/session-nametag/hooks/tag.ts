@@ -353,6 +353,8 @@ export type LiveEntry = {
   isManual: boolean
   /** When the name last changed, for the `updated` token; absent until it does. */
   updatedAt?: number
+  /** The folder /nametag force pinned the session to; absent, where it started. */
+  root?: string
 }
 
 /** A session's name and color, kept after it ends so a resume can restore them. */
@@ -364,6 +366,7 @@ export type SeenEntry = {
   isManual: boolean
   at: number
   updatedAt?: number
+  root?: string
 }
 
 /** The person's choices, shared by every session on the machine. */
@@ -421,6 +424,7 @@ export function asLive(raw: unknown): LiveEntry | null {
     title: typeof o.title === 'string' ? o.title : null,
     isManual: o.isManual === true,
     ...(typeof o.updatedAt === 'number' ? { updatedAt: o.updatedAt } : {}),
+    ...(typeof o.root === 'string' ? { root: o.root } : {}),
   }
 }
 
@@ -448,6 +452,7 @@ export function asSeen(raw: unknown): SeenEntry | null {
     title: typeof o.title === 'string' ? o.title : null,
     isManual: o.isManual === true,
     ...(typeof o.updatedAt === 'number' ? { updatedAt: o.updatedAt } : {}),
+    ...(typeof o.root === 'string' ? { root: o.root } : {}),
   }
 }
 
@@ -509,7 +514,7 @@ export const USAGE = [
   '  /nametag presets          preview every preset for this session',
   `  /nametag <preset>         use a preset from now on: ${PRESET_ORDER.join(', ')}`,
   '  /nametag template <text>  use your own template, e.g. {folder}{/branch}{ #n}',
-  '  /nametag force            rename and recolor this session now, even a resumed or renamed one',
+  '  /nametag force            tag this session for the folder the shell is in now, even a resumed or renamed one',
   '  /nametag color <c>        auto (per folder), off, or one of: ' + COLORS.join(', '),
   '  /nametag off [here]       stop naming new sessions (here = only in this folder)',
   '  /nametag on [here]        start again',
@@ -523,7 +528,7 @@ export const SUBCOMMANDS: readonly { name: string; description: string }[] = [
   { name: 'presets', description: 'preview every preset for this session' },
   ...PRESET_ORDER.map((name) => ({ name, description: `preset: ${PRESETS[name]}` })),
   { name: 'template', description: 'your own template; type { for the tokens' },
-  { name: 'force', description: 'rename and recolor this session now' },
+  { name: 'force', description: 'tag this session for the folder you are in now' },
   { name: 'color', description: 'auto, off, or a fixed color' },
   { name: 'off', description: 'stop tagging new sessions (add "here" for this folder only)' },
   { name: 'on', description: 'start tagging again (add "here" for this folder only)' },

@@ -16,7 +16,9 @@ to tell apart.
 - **Stays current**: after a turn that switched branches, or a `/model`, the
   name is updated. A `/rename` you type yourself stops that for the session.
 - **Resume aware**: a session reopened with `--resume` or `/relaunch` gets its
-  number and color back. A resumed session it never tagged keeps its name.
+  number and color back. A session it never tagged (an older resume, or one
+  already running when you install the mod) keeps its name and color until
+  you run `/nametag force`.
 
 ## Install
 

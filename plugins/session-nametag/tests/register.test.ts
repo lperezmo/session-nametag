@@ -120,13 +120,16 @@ describe('session start', () => {
     expect(w.ran).toEqual([])
   })
 
-  test('a resumed session the mod never tagged keeps its name and gets a color', async ($, on) => {
+  test('a running session the mod never tagged is left alone until /nametag force', async ($, on) => {
     const w = world(on, { turns: 4 })
 
     await start($, w)
+    expect(w.ran).toEqual([])
 
-    expect(w.ran.some((r) => r.startsWith('rename'))).toBe(false)
-    expect(w.ran.filter((r) => r.startsWith('color')).length).toBe(1)
+    await $.command.run({ command: 'nametag', args: 'force', origin: TYPED } as never)
+    await w.clock.advance(1000)
+    expect(w.ran[0]).toBe(`rename ${FULL}`)
+    expect(w.ran[1]).toMatch(/^color /)
   })
 
   test('a relaunched session gets its number and color back and keeps updating', async ($, on) => {

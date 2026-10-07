@@ -327,10 +327,12 @@ async function tagAtStart($: EngineInterface) {
   }
 
   if ((await $.session.turns()) > 0) {
-    me = await claim($, id, key, config)
+    // Resumed, forked, or the mod was just installed into a running session:
+    // its name and color may be the person's own, and neither can be read, so
+    // leave both. It still holds a number; /nametag force tags it.
+    me = await claim($, id, key, config, null)
     me = { ...me, isManual: true }
     await save($, me)
-    runSoon($, null, me.color, START_DELAY_MS)
 
     return
   }
@@ -387,6 +389,10 @@ async function applyNow($: EngineInterface): Promise<string> {
     const { key } = await values($, 1)
 
     me = await claim($, id, key, config)
+  }
+
+  if (!me.color && config.color !== 'off') {
+    me = { ...me, color: assign(me.key, await others($, id), config.color).color }
   }
 
   const now = await $.clock.now()

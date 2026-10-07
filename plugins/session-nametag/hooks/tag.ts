@@ -277,12 +277,41 @@ export function render(template: string, v: TagValues): string {
 }
 
 /**
- * A preset's template, or the text itself when it names no preset.
+ * A preset's or saved template's text, or the text itself when it names
+ * neither.
  *
- * @param template a preset name or a template
+ * @param template a preset name, a saved name, or a template
+ * @param saved the person's saved templates by name
  */
-export function resolveTemplate(template: string): string {
-  return isPreset(template) ? PRESETS[template] : template
+export function resolveTemplate(template: string, saved: Readonly<Record<string, string>> = {}): string {
+  if (isPreset(template)) {
+    return PRESETS[template]
+  }
+
+  return Object.prototype.hasOwnProperty.call(saved, template) ? (saved[template] ?? template) : template
+}
+
+/** Words a saved template may not be called: the presets and the options. */
+export const RESERVED = ['presets', 'list', 'preview', 'template', 'force', 'apply', 'now', 'color', 'colour', 'off', 'on', 'help', 'save', 'delete', 'remove'] as const
+
+/** How many saved templates the store keeps. */
+export const MAX_SAVED = 20
+
+/**
+ * Why a name cannot be used for a saved template, or null when it can.
+ *
+ * @param name the name the person typed
+ */
+export function badName(name: string): string | null {
+  if (!/^[a-z0-9][a-z0-9_-]{0,23}$/.test(name)) {
+    return 'Names are 1 to 24 lowercase letters, digits, - or _, starting with a letter or digit.'
+  }
+
+  if (isPreset(name) || (RESERVED as readonly string[]).includes(name)) {
+    return `"${name}" is taken by a built-in preset or option; pick another name.`
+  }
+
+  return null
 }
 
 /**
@@ -379,9 +408,11 @@ export type Config = {
   isOn: boolean
   /** Folder keys where new sessions are left alone. */
   offFolders: string[]
+  /** The person's own templates by name (`/nametag save`). */
+  saved: Record<string, string>
 }
 
-export const DEFAULT_CONFIG: Config = { template: DEFAULT_PRESET, color: 'auto', isOn: true, offFolders: [] }
+export const DEFAULT_CONFIG: Config = { template: DEFAULT_PRESET, color: 'auto', isOn: true, offFolders: [], saved: {} }
 
 /**
  * A stored value as a Config, defaults filling whatever is missing or wrong.
@@ -396,7 +427,27 @@ export function asConfig(raw: unknown): Config {
     color: typeof o.color === 'string' ? o.color : DEFAULT_CONFIG.color,
     isOn: typeof o.isOn === 'boolean' ? o.isOn : DEFAULT_CONFIG.isOn,
     offFolders: Array.isArray(o.offFolders) ? o.offFolders.filter((x): x is string => typeof x === 'string') : [],
+    saved: asSaved(o.saved),
   }
+}
+
+/**
+ * A stored value as saved templates, keeping only well-formed entries.
+ *
+ * @param raw what the store held
+ */
+function asSaved(raw: unknown): Record<string, string> {
+  const out: Record<string, string> = {}
+
+  if (raw && typeof raw === 'object' && !Array.isArray(raw)) {
+    for (const [name, text] of Object.entries(raw as Record<string, unknown>)) {
+      if (typeof text === 'string' && text.trim() && badName(name) === null) {
+        out[name] = text
+      }
+    }
+  }
+
+  return out
 }
 
 /**
@@ -506,14 +557,20 @@ export type Parsed =
   | { kind: 'apply' }
   | { kind: 'color'; color: string }
   | { kind: 'power'; isOn: boolean; isHere: boolean }
+  | { kind: 'save'; name: string; template: string | null }
+  | { kind: 'delete'; name: string }
+  | { kind: 'named'; name: string }
   | { kind: 'error'; text: string }
 
 export const USAGE = [
-  'Usage: /nametag [preset|template|force|color|off|on|presets|help]',
+  'Usage: /nametag [preset|template|save|delete|force|color|off|on|presets|help]',
   '  /nametag                  show this session\'s tag and the live sessions',
   '  /nametag presets          preview every preset for this session',
   `  /nametag <preset>         use a preset from now on: ${PRESET_ORDER.join(', ')}`,
   '  /nametag template <text>  use your own template, e.g. {folder}{/branch}{ #n}',
+  '  /nametag save <name>      keep the template in use under a name; /nametag <name> brings it back',
+  '  /nametag save <name> <text>  save that template under the name and use it',
+  '  /nametag delete <name>    forget a saved template',
   '  /nametag force            tag this session for the folder the shell is in now, even a resumed or renamed one',
   '  /nametag color <c>        auto (per folder), off, or one of: ' + COLORS.join(', '),
   '  /nametag off [here]       stop naming new sessions (here = only in this folder)',
@@ -528,6 +585,8 @@ export const SUBCOMMANDS: readonly { name: string; description: string }[] = [
   { name: 'presets', description: 'preview every preset for this session' },
   ...PRESET_ORDER.map((name) => ({ name, description: `preset: ${PRESETS[name]}` })),
   { name: 'template', description: 'your own template; type { for the tokens' },
+  { name: 'save', description: 'keep the template in use under a name' },
+  { name: 'delete', description: 'forget a saved template' },
   { name: 'force', description: 'tag this session for the folder you are in now' },
   { name: 'color', description: 'auto, off, or a fixed color' },
   { name: 'off', description: 'stop tagging new sessions (add "here" for this folder only)' },
@@ -547,8 +606,9 @@ const COMMAND_PREFIX = '/nametag '
  * @param text the whole prompt box
  * @param token the run of non-space characters that ends at the cursor
  * @param start where that run begins in `text`
+ * @param saved the person's saved templates by name
  */
-export function suggest(text: string, token: string, start: number): Suggestion[] {
+export function suggest(text: string, token: string, start: number, saved: Readonly<Record<string, string>> = {}): Suggestion[] {
   if (!text.toLowerCase().startsWith(COMMAND_PREFIX) || start < COMMAND_PREFIX.length) {
     return []
   }
@@ -557,7 +617,9 @@ export function suggest(text: string, token: string, start: number): Suggestion[
   const typed = token.toLowerCase()
   const brace = token.lastIndexOf('{')
 
-  if (brace >= 0 && (words.length === 0 || words[0] === 'template')) {
+  const isTemplateArg = words[0] === 'template' || (words[0] === 'save' && words.length >= 2)
+
+  if (brace >= 0 && (words.length === 0 || isTemplateArg)) {
     const before = token.slice(0, brace)
     const partial = token.slice(brace + 1).toLowerCase()
     const letters = partial.replace(/[^a-z]/g, '')
@@ -582,8 +644,14 @@ export function suggest(text: string, token: string, start: number): Suggestion[
     return rows
   }
 
+  const mine = Object.keys(saved).sort().map((name) => ({ name, description: `saved: ${saved[name] ?? ''}` }))
+
   if (words.length === 0) {
-    return SUBCOMMANDS.filter((c) => c.name.startsWith(typed)).map((c) => ({ text: c.name, description: c.description }))
+    return [...SUBCOMMANDS, ...mine].filter((c) => c.name.startsWith(typed)).map((c) => ({ text: c.name, description: c.description }))
+  }
+
+  if (words.length === 1 && (words[0] === 'delete' || words[0] === 'remove')) {
+    return mine.filter((c) => c.name.startsWith(typed)).map((c) => ({ text: c.name, description: c.description }))
   }
 
   if (words.length === 1 && (words[0] === 'color' || words[0] === 'colour')) {
@@ -655,8 +723,37 @@ export function parseArgs(args: string): Parsed {
     return { kind: 'power', isOn: word === 'on', isHere: where === 'here' }
   }
 
+  if (word === 'save') {
+    const name = (rest[0] ?? '').toLowerCase()
+
+    if (!name) {
+      return { kind: 'error', text: 'Give a name, e.g. /nametag save work' }
+    }
+
+    const why = badName(name)
+
+    if (why) {
+      return { kind: 'error', text: why }
+    }
+
+    const template = tail.slice(rest[0]?.length ?? 0).trim()
+
+    return { kind: 'save', name, template: template || null }
+  }
+
+  if (word === 'delete' || word === 'remove') {
+    const name = (rest[0] ?? '').toLowerCase()
+
+    return name ? { kind: 'delete', name } : { kind: 'error', text: 'Give the saved name, e.g. /nametag delete work' }
+  }
+
   if (text.includes('{')) {
     return { kind: 'template', template: text }
+  }
+
+  // Maybe one of the person's saved templates; the command knows which exist.
+  if (!rest.length && badName(word) === null) {
+    return { kind: 'named', name: word }
   }
 
   return { kind: 'error', text: `Unknown option "${first}". ${PRESET_ORDER.join(', ')} are the presets; /nametag help lists the rest.` }

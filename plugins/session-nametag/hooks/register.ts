@@ -37,6 +37,7 @@ import {
   isPreset,
   isWithin,
   LIVE_PREFIX,
+  MAX_SAVED,
   modelLabel,
   mustYield,
   parseArgs,
@@ -342,13 +343,13 @@ async function tagAtStart($: EngineInterface) {
     me = { ...me, title: seen.title, isManual: seen.isManual, ...(seen.updatedAt ? { updatedAt: seen.updatedAt } : {}), ...(seen.root ? { root: seen.root } : {}) }
 
     const { v } = await values($, me.n)
-    let title = me.isManual ? null : render(resolveTemplate(config.template), v)
+    let title = me.isManual ? null : render(resolveTemplate(config.template, config.saved), v)
     const isRename = title !== null && title !== seen.title
 
     if (title && isRename) {
       const now = await $.clock.now()
 
-      title = render(resolveTemplate(config.template), { ...v, updatedAt: now })
+      title = render(resolveTemplate(config.template, config.saved), { ...v, updatedAt: now })
       me = { ...me, title, updatedAt: now }
     }
 
@@ -372,7 +373,7 @@ async function tagAtStart($: EngineInterface) {
   me = await claim($, id, key, config)
 
   const { v } = await values($, me.n)
-  const title = render(resolveTemplate(config.template), v)
+  const title = render(resolveTemplate(config.template, config.saved), v)
 
   me = { ...me, title }
   await save($, me)
@@ -392,7 +393,7 @@ async function refresh($: EngineInterface) {
 
   const config = await readConfig($)
   const { v } = await values($, me.n)
-  const title = render(resolveTemplate(config.template), v)
+  const title = render(resolveTemplate(config.template, config.saved), v)
 
   if (title === me.title) {
     return
@@ -400,7 +401,7 @@ async function refresh($: EngineInterface) {
 
   // Something real changed: that is the moment the `updated` token shows.
   const now = await $.clock.now()
-  const updated = render(resolveTemplate(config.template), { ...v, updatedAt: now })
+  const updated = render(resolveTemplate(config.template, config.saved), { ...v, updatedAt: now })
 
   me = { ...me, title: updated, updatedAt: now }
   await save($, me)
@@ -416,6 +417,7 @@ async function refresh($: EngineInterface) {
 async function applyNow($: EngineInterface, isPin = false): Promise<string> {
   const id = await $.session.id()
   const config = await readConfig($)
+  const colorBefore = me?.color ?? null
 
   if (isPin) {
     // /nametag force: follow the shell to wherever it is now, and keep the
@@ -446,11 +448,13 @@ async function applyNow($: EngineInterface, isPin = false): Promise<string> {
 
   const now = await $.clock.now()
   const { v } = await values($, me.n)
-  const title = render(resolveTemplate(config.template), { ...v, updatedAt: now })
+  const title = render(resolveTemplate(config.template, config.saved), { ...v, updatedAt: now })
 
   me = { ...me, title, isManual: false, at: now, updatedAt: now }
   await save($, me)
-  runSoon($, title, me.color)
+  // A preset or template change keeps the color; only force, or a color that
+  // actually changed, runs /color again.
+  runSoon($, title, isPin || me.color !== colorBefore ? me.color : null)
 
   return title
 }
@@ -491,7 +495,11 @@ async function status($: EngineInterface): Promise<string> {
   const config = await readConfig($)
   const id = await $.session.id()
   const live = await others($, id)
-  const template = isPreset(config.template) ? `preset "${config.template}"` : `template ${config.template}`
+  const template = isPreset(config.template)
+    ? `preset "${config.template}"`
+    : config.saved[config.template] !== undefined
+      ? `saved "${config.template}" (${config.saved[config.template] ?? ''})`
+      : `template ${config.template}`
   const lines = [
     me ? `This session: ${me.title ?? '(name left as is)'}${me.color ? `, ${me.color}` : ''}${me.isManual ? ', name kept as you set it' : ''}` : 'This session is not tagged. /nametag force tags it.',
     `Naming: ${template}. Color: ${config.color}.${config.isOn ? '' : ' Off for new sessions.'}${config.offFolders.length ? ` Off in ${config.offFolders.length} folder(s).` : ''}`,
@@ -555,7 +563,7 @@ export function register(on: On) {
   // and the template tokens once a { is typed.
   on('prompt.autocomplete', async ($, e, next) => {
     const result = await next(e)
-    const mine = suggest(e.text, e.token, e.start)
+    const mine = e.text.toLowerCase().startsWith('/nametag ') ? suggest(e.text, e.token, e.start, (await readConfig($)).saved) : []
 
     return mine.length ? { suggestions: [...result.suggestions, ...mine] } : result
   })
@@ -609,9 +617,12 @@ export function register(on: On) {
       case 'presets': {
         const { v } = await values($, me?.n ?? 1)
         const config = await readConfig($)
-        const lines = PRESET_ORDER.map((name) => `${name === config.template ? '>' : ' '} ${name.padEnd(8)} ${render(PRESETS[name], v)}`)
+        const names = [...PRESET_ORDER, ...Object.keys(config.saved).sort()]
+        const width = Math.max(8, ...names.map((name) => name.length))
+        const lines = names.map((name) => `${name === config.template ? '>' : ' '} ${name.padEnd(width)} ${render(resolveTemplate(name, config.saved), v)}`)
+        const custom = isPreset(config.template) || config.saved[config.template] !== undefined ? [] : [`> ${'(yours)'.padEnd(width)} ${render(config.template, v)}   /nametag save <name> keeps it`]
 
-        return { text: ['Presets for this session (> is in use; /nametag <name> picks one):', ...lines].join('\n') }
+        return { text: ['Presets for this session (> is in use; /nametag <name> picks one):', ...lines, ...custom].join('\n') }
       }
       case 'preset':
       case 'template': {
@@ -622,6 +633,56 @@ export function register(on: On) {
         const title = await applyNow($)
 
         return { text: `New sessions will be named like this one: ${title}` }
+      }
+      case 'named': {
+        const config = await readConfig($)
+
+        if (config.saved[parsed.name] === undefined) {
+          return { text: `No preset or saved template called "${parsed.name}". /nametag presets lists them; /nametag help lists the options.` }
+        }
+
+        await $.store.set(CONFIG_KEY, { ...config, template: parsed.name })
+        const title = await applyNow($)
+
+        return { text: `Using "${parsed.name}": ${title}` }
+      }
+      case 'save': {
+        const config = await readConfig($)
+        const text = parsed.template ?? resolveTemplate(config.template, config.saved)
+        const isNew = config.saved[parsed.name] === undefined
+
+        if (isNew && Object.keys(config.saved).length >= MAX_SAVED) {
+          return { text: `You have ${MAX_SAVED} saved templates already; /nametag delete <name> makes room.` }
+        }
+
+        await $.store.set(CONFIG_KEY, { ...config, saved: { ...config.saved, [parsed.name]: text }, template: parsed.name })
+
+        if (parsed.template) {
+          const title = await applyNow($)
+
+          return { text: `Saved "${parsed.name}" and using it: ${title}` }
+        }
+
+        return { text: `${isNew ? 'Saved' : 'Updated'} "${parsed.name}": ${text}. /nametag ${parsed.name} brings it back.` }
+      }
+      case 'delete': {
+        const config = await readConfig($)
+
+        if (config.saved[parsed.name] === undefined) {
+          return { text: `No saved template called "${parsed.name}".` }
+        }
+
+        const saved = { ...config.saved }
+        const text = saved[parsed.name] ?? ''
+
+        delete saved[parsed.name]
+
+        // Deleting the one in use keeps its text as the template, so nothing renames.
+        const template = config.template === parsed.name ? text : config.template
+
+        await $.store.set(CONFIG_KEY, { ...config, saved, template })
+
+        return { text: `Deleted "${parsed.name}".` }
       }
       case 'apply': {
         const title = await applyNow($, true)

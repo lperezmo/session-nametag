@@ -291,6 +291,29 @@ describe('after the start', () => {
     expect(w.ran).toContain('rename hess-laundry')
   })
 
+  test('save, switch away, come back by name, delete', async ($, on) => {
+    const w = world(on)
+    const run = (args: string) => $.command.run({ command: 'nametag', args, origin: TYPED } as never)
+
+    await start($, w)
+    await run('template {family} po po {host}')
+    expect((await run('save popo')).text).toContain('Saved "popo"')
+    await run('compact')
+    await w.clock.advance(1000)
+    expect(w.ran[w.ran.length - 1]).toBe('rename hess-laundry')
+
+    expect((await run('popo')).text).toContain('Opus po po LUIS-DESKTOP')
+    await w.clock.advance(1000)
+    expect(w.ran[w.ran.length - 1]).toBe('rename Opus po po LUIS-DESKTOP')
+    expect((await run('presets')).text).toContain('> popo')
+
+    // Only the start ran /color; preset and template changes keep it quiet.
+    expect(w.ran.filter((r) => r.startsWith('color')).length).toBe(1)
+
+    expect((await run('delete popo')).text).toContain('Deleted "popo"')
+    expect((await run('popo')).text).toContain('No preset or saved template')
+  })
+
   test('/nametag presets previews every preset', async ($, on) => {
     const w = world(on)
 

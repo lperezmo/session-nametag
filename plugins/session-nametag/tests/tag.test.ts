@@ -17,6 +17,7 @@ import {
   pickNumber,
   PRESETS,
   render,
+  resolveTemplate,
   STALE_MS,
   type LiveEntry,
   type TagValues,
@@ -139,7 +140,7 @@ describe('picking', () => {
 
 describe('config', () => {
   test('defaults fill what is missing', () => {
-    expect(asConfig(undefined)).toEqual({ template: 'full', color: 'auto', isOn: true, offFolders: [] })
+    expect(asConfig(undefined)).toEqual({ template: 'full', color: 'auto', isOn: true, offFolders: [], saved: {} })
     expect(asConfig({ template: 'compact', isOn: false }).template).toBe('compact')
   })
 })
@@ -163,7 +164,24 @@ describe('parseArgs', () => {
     expect(parseArgs('color teal').kind).toBe('error')
     expect(parseArgs('off here')).toEqual({ kind: 'power', isOn: false, isHere: true })
     expect(parseArgs('on')).toEqual({ kind: 'power', isOn: true, isHere: false })
-    expect(parseArgs('bogus').kind).toBe('error')
+    expect(parseArgs('bogus')).toEqual({ kind: 'named', name: 'bogus' })
+    expect(parseArgs('bogus extra').kind).toBe('error')
+  })
+
+  test('save and delete', () => {
+    expect(parseArgs('save Work')).toEqual({ kind: 'save', name: 'work', template: null })
+    expect(parseArgs('save work {family} {folder}')).toEqual({ kind: 'save', name: 'work', template: '{family} {folder}' })
+    expect(parseArgs('save full').kind).toBe('error')
+    expect(parseArgs('save color').kind).toBe('error')
+    expect(parseArgs('save a/b').kind).toBe('error')
+    expect(parseArgs('save').kind).toBe('error')
+    expect(parseArgs('delete work')).toEqual({ kind: 'delete', name: 'work' })
+  })
+
+  test('saved templates resolve by name, presets win', () => {
+    expect(resolveTemplate('work', { work: '{folder}' })).toBe('{folder}')
+    expect(resolveTemplate('toString', {})).toBe('toString')
+    expect(asConfig({ saved: { work: '{folder}', full: 'x', 'Bad Name': 'y', empty: ' ' } }).saved).toEqual({ work: '{folder}' })
   })
 })
 
@@ -191,6 +209,19 @@ describe('typeahead', () => {
     expect(all[0]?.label).toBe('{[model] }')
     expect(at('/nametag template {folder}{/b').map((s) => s.text)).toEqual(['{folder}{/branch}'])
     expect(at('/nametag template {fa').map((s) => s.label)).toEqual(['{[family] }', '{family}'])
+  })
+
+  test('saved templates show up as options, and after delete', () => {
+    const saved = { work: '{family} {folder}' }
+    const pick = (text: string) => {
+      const token = text.split(' ').pop() ?? ''
+
+      return suggest(text, token, text.length - token.length, saved).map((s) => s.text)
+    }
+
+    expect(pick('/nametag w')).toEqual(['work'])
+    expect(pick('/nametag delete w')).toEqual(['work'])
+    expect(pick('/nametag save work {fa')).toEqual(['{[family] }', '{family}'])
   })
 
   test('nothing outside /nametag or on the command word itself', () => {

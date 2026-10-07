@@ -11,6 +11,8 @@ to tell apart.
 
 - **Name** from a template: model, folder, git branch, instance number,
   machine, start time. Change the style with `/nametag <preset>`.
+- **Topic** you set: `/nametag topic fix the backfill script` puts what you
+  are working on in the name.
 - **Color** per folder: each folder hashes to one of the eight `/color`
   colors, and moves to the next free one if another live session has it.
 - **Stays current**: after a turn that switched branches, or a `/model`, the
@@ -49,8 +51,7 @@ branch only shows inside git.
 /nametag template {folder}{/branch}{ #nth}{ · topic}
 ```
 
-Typing `/nametag ` shows the options as you type, and inside a template a
-`{` lists every token.
+`/nametag help` lists every token.
 
 | Token | Example |
 |---|---|

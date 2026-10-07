@@ -4,9 +4,22 @@
   "version": "0.4.0",
   "description": "Names and colors each Claude Code session when it starts (folder, branch, instance number, machine, model, start time), so many sessions are easy to tell apart. /nametag picks the style.",
   "author": {
-    "name": "Luis Perez Morales"
+    "name": "Luis Perez Morales",
+    "url": "https://github.com/lperezmo"
   },
   "homepage": "https://github.com/lperezmo/session-nametag",
   "repository": "https://github.com/lperezmo/session-nametag",
-  "license": "MIT"
+  "documentationUrl": "https://github.com/lperezmo/session-nametag#readme",
+  "supportUrl": "https://github.com/lperezmo/session-nametag/issues",
+  "privacyPolicyUrl": "https://github.com/lperezmo/session-nametag#what-it-does-on-your-machine",
+  "termsOfServiceUrl": "https://github.com/lperezmo/session-nametag/blob/main/LICENSE",
+  "license": "MIT",
+  "keywords": [
+    "session name",
+    "rename",
+    "color",
+    "git branch",
+    "remote control",
+    "mod"
+  ]
 }

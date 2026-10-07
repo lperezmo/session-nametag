@@ -49,8 +49,11 @@ branch only shows inside git.
 Tokens: `model`, `folder` (the repository, so worktrees and subfolders share
 it), `dir` (the folder the session started in), `branch`, `n` (hidden for the
 first session), `num` (always shown), `host`, `user`, `datetime`, `date`,
-`day`, `time`. Each `{...}` group is dropped when one of its tokens is empty,
-so `{/branch}` disappears outside git.
+`day`, `time`, `updated`. The date tokens are when the session started and
+never move, even when a branch switch renames it. `updated` is when the name
+last changed (`2:14 pm`, or `Thu 2:14 pm` on a later day). Each `{...}` group
+is dropped when one of its tokens is empty, so `{/branch}` disappears outside
+git.
 
 ## Commands
 

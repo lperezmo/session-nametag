@@ -172,6 +172,20 @@ describe('after the start', () => {
     expect(w.ran).toContain(`rename ${FULL.replace('fix/backfill', 'main')}`)
   })
 
+  test('a rename keeps the start date and moves the updated time', async ($, on) => {
+    const w = world(on, { stored: { [CONFIG_KEY]: { template: '{folder}{/branch} {datetime}{ · updated}', color: 'off', isOn: true, offFolders: [] } } })
+
+    await start($, w)
+    expect(w.ran[0]).toBe('rename hess-laundry/fix/backfill Wed Oct 7th, 2026 9:05 am · 9:05 am')
+
+    await w.clock.advance(2 * 3600_000)
+    w.session.branch = 'main'
+    await $.turn.complete({ answer: '', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+    await w.clock.advance(1000)
+
+    expect(w.ran[w.ran.length - 1]).toBe('rename hess-laundry/main Wed Oct 7th, 2026 9:05 am · 11:05 am')
+  })
+
   test('a subagent\'s turn does not rename', async ($, on) => {
     const w = world(on)
 

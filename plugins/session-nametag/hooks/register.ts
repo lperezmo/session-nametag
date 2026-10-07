@@ -200,6 +200,7 @@ async function values($: EngineInterface, n: number): Promise<{ v: TagValues; ke
     host: fixed.host,
     user: fixed.user,
     startedAt: fixed.startedAt,
+    updatedAt: me?.updatedAt ?? fixed.startedAt,
   }
 
   return { v, key: folderKey(project) }
@@ -308,14 +309,17 @@ async function tagAtStart($: EngineInterface) {
 
   if (seen) {
     me = await claim($, id, key, config, seen.color, seen.n)
-    me = { ...me, title: seen.title, isManual: seen.isManual }
+    me = { ...me, title: seen.title, isManual: seen.isManual, ...(seen.updatedAt ? { updatedAt: seen.updatedAt } : {}) }
 
     const { v } = await values($, me.n)
-    const title = me.isManual ? null : render(resolveTemplate(config.template), v)
+    let title = me.isManual ? null : render(resolveTemplate(config.template), v)
     const isRename = title !== null && title !== seen.title
 
-    if (title) {
-      me = { ...me, title }
+    if (title && isRename) {
+      const now = await $.clock.now()
+
+      title = render(resolveTemplate(config.template), { ...v, updatedAt: now })
+      me = { ...me, title, updatedAt: now }
     }
 
     await save($, me)
@@ -362,9 +366,13 @@ async function refresh($: EngineInterface) {
     return
   }
 
-  me = { ...me, title }
+  // Something real changed: that is the moment the `updated` token shows.
+  const now = await $.clock.now()
+  const updated = render(resolveTemplate(config.template), { ...v, updatedAt: now })
+
+  me = { ...me, title: updated, updatedAt: now }
   await save($, me)
-  runSoon($, title, null)
+  runSoon($, updated, null)
 }
 
 /**
@@ -383,10 +391,11 @@ async function applyNow($: EngineInterface): Promise<string> {
     me = await claim($, id, key, config)
   }
 
+  const now = await $.clock.now()
   const { v } = await values($, me.n)
-  const title = render(resolveTemplate(config.template), v)
+  const title = render(resolveTemplate(config.template), { ...v, updatedAt: now })
 
-  me = { ...me, title, isManual: false, at: await $.clock.now() }
+  me = { ...me, title, isManual: false, at: now, updatedAt: now }
   await save($, me)
   runSoon($, title, me.color)
 
@@ -402,7 +411,7 @@ async function applyNow($: EngineInterface): Promise<string> {
  */
 async function retire($: EngineInterface, entry: LiveEntry) {
   await $.store.delete(`${LIVE_PREFIX}${entry.id}`)
-  await $.store.set(`${SEEN_PREFIX}${entry.id}`, { id: entry.id, n: entry.n, color: entry.color, title: entry.title, isManual: entry.isManual, at: await $.clock.now() })
+  await $.store.set(`${SEEN_PREFIX}${entry.id}`, { id: entry.id, n: entry.n, color: entry.color, title: entry.title, isManual: entry.isManual, at: await $.clock.now(), updatedAt: entry.updatedAt })
 }
 
 /**

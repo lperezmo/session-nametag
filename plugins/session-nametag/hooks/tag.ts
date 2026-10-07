@@ -63,10 +63,12 @@ export type TagValues = {
   user: string
   /** When the session first started, in epoch milliseconds. */
   startedAt: number
+  /** When the name last changed for a reason other than this time itself. */
+  updatedAt: number
 }
 
 /** The token names a template may use. */
-export const TOKENS = ['model', 'folder', 'dir', 'branch', 'num', 'n', 'host', 'user', 'datetime', 'date', 'day', 'time'] as const
+export const TOKENS = ['model', 'folder', 'dir', 'branch', 'num', 'n', 'host', 'user', 'datetime', 'date', 'day', 'time', 'updated'] as const
 
 const TOKEN_RE = new RegExp(`(?<![A-Za-z])(${TOKENS.join('|')})(?![A-Za-z])`, 'g')
 
@@ -114,6 +116,21 @@ export function dateParts(ms: number): { datetime: string; date: string; day: st
   const time = clockTime(d)
 
   return { datetime: `${day} ${date} ${time}`, date, day, time }
+}
+
+/**
+ * When the name last changed: the clock time on the day the session started
+ * (`2:14 pm`), the weekday too on a later day (`Thu 2:14 pm`).
+ *
+ * @param startedAt when the session started
+ * @param updatedAt when the name last changed
+ */
+export function updatedLabel(startedAt: number, updatedAt: number): string {
+  const start = new Date(startedAt)
+  const d = new Date(updatedAt)
+  const isSameDay = start.getFullYear() === d.getFullYear() && start.getMonth() === d.getMonth() && start.getDate() === d.getDate()
+
+  return isSameDay ? clockTime(d) : `${DAYS[d.getDay()] ?? ''} ${clockTime(d)}`
 }
 
 /**
@@ -187,6 +204,7 @@ export function render(template: string, v: TagValues): string {
       case 'date': return when.date
       case 'day': return when.day
       case 'time': return when.time
+      case 'updated': return updatedLabel(v.startedAt, v.updatedAt)
       default: return ''
     }
   }
@@ -292,6 +310,8 @@ export type LiveEntry = {
   title: string | null
   /** True once the person renamed the session themselves. */
   isManual: boolean
+  /** When the name last changed, for the `updated` token; absent until it does. */
+  updatedAt?: number
 }
 
 /** A session's name and color, kept after it ends so a resume can restore them. */
@@ -302,6 +322,7 @@ export type SeenEntry = {
   title: string | null
   isManual: boolean
   at: number
+  updatedAt?: number
 }
 
 /** The person's choices, shared by every session on the machine. */
@@ -358,6 +379,7 @@ export function asLive(raw: unknown): LiveEntry | null {
     color: typeof o.color === 'string' ? o.color : null,
     title: typeof o.title === 'string' ? o.title : null,
     isManual: o.isManual === true,
+    ...(typeof o.updatedAt === 'number' ? { updatedAt: o.updatedAt } : {}),
   }
 }
 
@@ -384,6 +406,7 @@ export function asSeen(raw: unknown): SeenEntry | null {
     color: typeof o.color === 'string' ? o.color : null,
     title: typeof o.title === 'string' ? o.title : null,
     isManual: o.isManual === true,
+    ...(typeof o.updatedAt === 'number' ? { updatedAt: o.updatedAt } : {}),
   }
 }
 
@@ -449,7 +472,7 @@ export const USAGE = [
   '  /nametag color <c>        auto (per folder), off, or one of: ' + COLORS.join(', '),
   '  /nametag off [here]       stop naming new sessions (here = only in this folder)',
   '  /nametag on [here]        start again',
-  `Tokens: ${TOKENS.join(', ')}. A {group} with an empty token disappears, so {/branch} hides outside git and { #n} hides for the first session in a folder.`,
+  `Tokens: ${TOKENS.join(', ')}. The date tokens are when the session started; updated is when the name last changed. A {group} with an empty token disappears, so {/branch} hides outside git and { #n} hides for the first session in a folder.`,
 ].join('\n')
 
 /**

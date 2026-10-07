@@ -10,6 +10,7 @@ import {
   modelLabel,
   mustYield,
   ordinal,
+  updatedLabel,
   parseArgs,
   pickColor,
   pickNumber,
@@ -34,6 +35,7 @@ const V: TagValues = {
   host: 'LUIS-DESKTOP',
   user: 'luis',
   startedAt: START,
+  updatedAt: START,
 }
 
 function live(id: string, key: string, n: number, color: string | null = null): LiveEntry {
@@ -79,6 +81,12 @@ describe('labels', () => {
     expect(modelLabel('claude-fable-5-1')).toBe('Fable 5.1')
     expect(modelLabel('opus')).toBe('Opus')
     expect(modelLabel('claude-haiku-4-5-20251001')).toBe('Haiku 4.5')
+  })
+
+  test('updated reads the time on the start day and adds the weekday later', () => {
+    expect(updatedLabel(START, START + 3 * 3600_000)).toBe('12:05 pm')
+    expect(updatedLabel(START, START + 24 * 3600_000)).toBe('Thu 9:05 am')
+    expect(render('{folder}{ (updated)}', { ...V, updatedAt: START + 3 * 3600_000 })).toBe('hess-laundry (12:05 pm)')
   })
 
   test('ordinals', () => {

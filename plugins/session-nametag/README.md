@@ -66,9 +66,11 @@ Typing `/nametag ` shows the options as you type, and inside a template a
 | `day` | Wed |
 | `time` | 9:05 am |
 | `updated` | 2:14 pm, or Thu 2:14 pm on a later day |
+| `updateddatetime` | Thu Oct 8th, 2026 11:00 am |
+| `updateddate` | Oct 8th, 2026 |
 
 The date tokens are when the session started and never move, even when a
-branch switch renames it. `updated` is when the name last changed. Each
+branch switch renames it. The `updated` tokens are when the name last changed. Each
 `{...}` group is dropped when one of its tokens is empty, so `{/branch}`
 disappears outside git.
 

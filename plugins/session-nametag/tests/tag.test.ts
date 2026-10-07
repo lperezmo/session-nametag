@@ -88,6 +88,10 @@ describe('labels', () => {
     expect(updatedLabel(START, START + 3 * 3600_000)).toBe('12:05 pm')
     expect(updatedLabel(START, START + 24 * 3600_000)).toBe('Thu 9:05 am')
     expect(render('{folder}{ (updated)}', { ...V, updatedAt: START + 3 * 3600_000 })).toBe('hess-laundry (12:05 pm)')
+    const nextDay = { ...V, updatedAt: START + 26 * 3600_000 }
+
+    expect(render('{folder} {datetime} · {updateddatetime}', nextDay)).toBe('hess-laundry Wed Oct 7th, 2026 9:05 am · Thu Oct 8th, 2026 11:05 am')
+    expect(render('{updateddate}', nextDay)).toBe('Oct 8th, 2026')
   })
 
   test('ordinals', () => {

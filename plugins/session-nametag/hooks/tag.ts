@@ -67,7 +67,7 @@ export type TagValues = {
 }
 
 /** The token names a template may use. */
-export const TOKENS = ['model', 'family', 'folder', 'dir', 'branch', 'num', 'n', 'host', 'datetime', 'date', 'day', 'time', 'updated'] as const
+export const TOKENS = ['model', 'family', 'folder', 'dir', 'branch', 'num', 'n', 'host', 'datetime', 'date', 'day', 'time', 'updated', 'updateddatetime', 'updateddate'] as const
 
 export type Token = (typeof TOKENS)[number]
 
@@ -85,7 +85,9 @@ export const TOKEN_HELP: Record<Token, string> = {
   date: 'session start date, e.g. Oct 7th, 2026',
   day: 'session start weekday, e.g. Wed',
   time: 'session start time, e.g. 9:05 am',
-  updated: 'when the name last changed, e.g. 2:14 pm',
+  updated: 'when the name last changed, e.g. 2:14 pm (Thu 2:14 pm on a later day)',
+  updateddatetime: 'when the name last changed, e.g. Thu Oct 8th, 2026 11:00 am',
+  updateddate: 'the day the name last changed, e.g. Oct 8th, 2026',
 }
 
 /** Groups with their usual punctuation, offered first in the typeahead. */
@@ -246,6 +248,8 @@ export function render(template: string, v: TagValues): string {
       case 'day': return when.day
       case 'time': return when.time
       case 'updated': return updatedLabel(v.startedAt, v.updatedAt)
+      case 'updateddatetime': return dateParts(v.updatedAt).datetime
+      case 'updateddate': return dateParts(v.updatedAt).date
       default: return ''
     }
   }

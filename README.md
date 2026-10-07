@@ -116,7 +116,8 @@ data anywhere; everything below stays local.
   `git`.
 - **What it reads:** the repository's `.git/HEAD` (the branch) and, only
   when your template uses `remote`, `.git/config` (the origin URL); the host
-  name (`COMPUTERNAME`, `HOSTNAME` or `/etc/hostname`); the `NAMETAG_OFF`
+  name (`COMPUTERNAME`, `HOSTNAME`, `/etc/hostname`, or on macOS
+  `/Library/Preferences/SystemConfiguration/preferences.plist`); the `NAMETAG_OFF`
   variable; the session's folder, model and start time. It never reads your
   prompts or the conversation: `topic` is only what you type after
   `/nametag topic`. No tokens, keys or credentials.

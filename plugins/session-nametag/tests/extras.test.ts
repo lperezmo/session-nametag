@@ -1,6 +1,6 @@
 import { describe, expect, test, tier } from 'claude-code/testing'
 
-import { branchFromHead, codenameFor, dayKey, gitDirFromFile, originFromConfig, remoteSlug, shorten, sigilFor, SIGILS } from '../hooks/extras'
+import { branchFromHead, codenameFor, dayKey, gitDirFromFile, macHostName, originFromConfig, remoteSlug, shorten, sigilFor, SIGILS } from '../hooks/extras'
 import { render, usedTokens, type TagValues } from '../hooks/tag'
 
 tier('user')
@@ -40,6 +40,14 @@ describe('git', () => {
 
     expect(originFromConfig(config)).toBe('git@host:owner/x.git')
     expect(originFromConfig('[core]\n')).toBe('')
+  })
+
+  test('the Mac name from its system plist', () => {
+    const plist = '<dict><key>ComputerName</key>\n<string>Luis MacBook</string><key>LocalHostName</key>\n\t<string>Luis-MacBook</string></dict>'
+
+    expect(macHostName(plist)).toBe('Luis-MacBook')
+    expect(macHostName('<key>ComputerName</key><string>Luis MacBook</string>')).toBe('Luis MacBook')
+    expect(macHostName('')).toBe('')
   })
 
   test('remotes as owner/name', () => {

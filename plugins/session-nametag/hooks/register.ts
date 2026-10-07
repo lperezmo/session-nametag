@@ -54,7 +54,7 @@ import {
   type Token,
   usedTokens,
 } from './tag'
-import { branchFromHead, codenameFor, dayKey, gitDirFromFile, originFromConfig, remoteSlug, shorten, sigilFor } from './extras'
+import { branchFromHead, codenameFor, dayKey, gitDirFromFile, macHostName, originFromConfig, remoteSlug, shorten, sigilFor } from './extras'
 
 const COMMAND_NAME = 'nametag'
 
@@ -118,8 +118,8 @@ async function others($: EngineInterface, selfId: string): Promise<LiveEntry[]> 
 }
 
 /**
- * The machine's name: the environment first, then /etc/hostname; empty when
- * neither has it, and the host group hides.
+ * The machine's name: the environment first, then /etc/hostname, then the
+ * macOS system configuration; empty when none has it, and the host group hides.
  *
  * @param $ the engine interface
  */
@@ -140,7 +140,10 @@ async function hostName($: EngineInterface): Promise<string> {
     // Not Linux, or not readable.
   }
 
-  return ''
+  // macOS keeps the name in the system configuration file.
+  const plist = await readText($, '/Library/Preferences/SystemConfiguration/preferences.plist')
+
+  return macHostName(plist)
 }
 
 /** A git repository as its files show it: its top folder and its git folder. */

@@ -87,6 +87,25 @@ export function originFromConfig(config: string): string {
 }
 
 /**
+ * The Mac's name from its system configuration plist: LocalHostName (the
+ * network name, e.g. Luiss-MacBook-Pro), else ComputerName; empty when the
+ * file is missing or not XML.
+ *
+ * @param plist the preferences.plist text
+ */
+export function macHostName(plist: string): string {
+  for (const name of ['LocalHostName', 'ComputerName']) {
+    const match = new RegExp('<key>' + name + '</key>\\s*<string>([^<]+)</string>').exec(plist)
+
+    if (match) {
+      return (match[1] ?? '').trim()
+    }
+  }
+
+  return ''
+}
+
+/**
  * A remote URL as owner/name: scp style `git@host:owner/x.git`,
  * `https://host/owner/x` and `ssh://host/a/owner/x.git` all work.
  *

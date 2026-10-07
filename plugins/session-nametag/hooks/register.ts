@@ -680,9 +680,14 @@ export function register(on: On) {
     return result
   })
 
-  // Only marks that a turn runs, so a cd Claude makes in it is not followed;
-  // the prompt itself is never read.
+  // A folder change found as a turn starts happened before it: a `!cd` you
+  // typed. Then the turn is marked, so a cd Claude makes in it is not
+  // followed. The prompt itself is never read.
   on('turn.start', async ($, e, next) => {
+    if (!isTurn) {
+      await followShell($)
+    }
+
     isTurn = true
 
     return next(e)

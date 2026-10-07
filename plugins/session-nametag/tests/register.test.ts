@@ -269,6 +269,13 @@ describe('after the start', () => {
     w.session.cwd = 'D:\\Python\\session-nametag'
     await w.clock.advance(5000)
     expect(last()).toBe('rename session-nametag/fix/backfill')
+
+    // A !cd followed at once by a turn still counts as yours.
+    w.session.cwd = 'D:/Python/hess-laundry'
+    await $.turn.start({ text: '', turnId: 't2' } as never)
+    await $.turn.complete({ answer: '', durationMs: 1, isAborted: false, turnId: 't2', reason: 'answer' } as never)
+    await w.clock.advance(5000)
+    expect(last()).toBe('rename hess-laundry/fix/backfill')
   })
 
   test('a branch switch renames after the turn, and only then', async ($, on) => {

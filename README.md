@@ -37,7 +37,7 @@ branch only shows inside git.
 |---|---|
 | `compact` | `hess-laundry #2` |
 | `branch` | `hess-laundry/fix/backfill #2` |
-| `status` | `🧺 hess-laundry/fix/backfill* ↑2 #2 · fix the backfill script` |
+| `status` | `🧺 hess-laundry/fix/backfill #2 · fix the backfill script` |
 | `host` | `hess-laundry/fix/backfill #2 @ LUIS-DESKTOP` |
 | `model` | `[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP` |
 | `timed` | `[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP Wed 9:05 am` |
@@ -60,13 +60,10 @@ Typing `/nametag ` shows the options as you type, and inside a template a
 | `dir` | the folder the session started in |
 | `remote` | lperezmo/hess-laundry |
 | `branch` | fix/backfill |
-| `dirty` | `*` when there are uncommitted changes |
-| `ahead` | 2 (commits not pushed yet; hidden at 0) |
-| `lastcommit` | Fix the backfill script for… |
 | `nth` | 2 (hidden for the first session in a folder) |
 | `num` | 1 (always shown) |
 | `host` | LUIS-DESKTOP |
-| `topic` | fix the backfill script (from the first prompt, or `/nametag topic`) |
+| `topic` | fix the backfill script (set with `/nametag topic`) |
 | `codename` | brisk-otter (fixed for the session) |
 | `sigil` | 🧺 (an emoji per folder) |
 | `todaycount` | 7 (the 7th session started today on this machine) |
@@ -81,8 +78,7 @@ Typing `/nametag ` shows the options as you type, and inside a template a
 The date tokens are when the session started and never move, even when a
 branch switch renames it. The `updated` tokens are when the name last changed. Each
 `{...}` group is dropped when one of its tokens is empty, so `{/branch}`
-disappears outside git. `dirty` and `ahead` rename the session when you edit,
-commit or push, so they leave a few more `/rename` lines than the others.
+disappears outside git.
 
 ## Commands
 
@@ -96,7 +92,7 @@ commit or push, so they leave a few more `/rename` lines than the others.
 | `/nametag save <name> [text]` | Keep the template in use (or the one given) under a name |
 | `/nametag <name>` | Switch to a saved template |
 | `/nametag delete <name>` | Forget a saved template |
-| `/nametag topic <text>` | Set what this session is about; `auto` takes it from the next prompt, `off` clears it |
+| `/nametag topic <text>` | Set what this session is about; `off` clears it |
 | `/nametag sigil <emoji>` | Pick this folder's emoji; `auto` goes back to the one it was given |
 | `/nametag force` | Tag this session for the folder you are in now (after a `cd`), even a resumed or renamed one |
 | `/nametag color <c>` | `auto` (per folder), `off`, or a fixed color |
@@ -116,22 +112,18 @@ data anywhere; everything below stays local.
   topic, a `/nametag` command) and never otherwise. Each leaves one short line
   in the transcript. A mod cannot set the name silently: the built-in security
   mod keeps classic hook events such as SessionStart away from installed mods.
-- **Programs it starts:** `git`, in the session's folder, to read the branch
-  and state: `git rev-parse --show-toplevel`, `git status --porcelain=v2
-  --branch`, and only when your template uses `remote` or `lastcommit`,
-  `git remote get-url origin` and `git log -1 --format=%s`. `hostname` runs
-  only when `COMPUTERNAME` / `HOSTNAME` are unset and `/etc/hostname` is
-  missing. Their output goes into the session name and nowhere else.
-- **What it reads:** the host name (`COMPUTERNAME`, `HOSTNAME` or
-  `/etc/hostname`), the `NAMETAG_OFF` variable, the session's folder, model
-  and start time, and the first prompt you type, from which it takes a few
-  words for the `topic` token. No tokens, keys or credentials.
+- **Programs it starts:** none. Git is read from its files, not by running
+  `git`.
+- **What it reads:** the repository's `.git/HEAD` (the branch) and, only
+  when your template uses `remote`, `.git/config` (the origin URL); the host
+  name (`COMPUTERNAME`, `HOSTNAME` or `/etc/hostname`); the `NAMETAG_OFF`
+  variable; the session's folder, model and start time. It never reads your
+  prompts or the conversation: `topic` is only what you type after
+  `/nametag topic`. No tokens, keys or credentials.
 - **Hooks:** `session.start` registers `/nametag` and tags the session;
   `turn.complete` re-checks git after each turn; `command.run` handles
   `/nametag`, notices a manual `/rename` or `/color` and refreshes after
-  `/model`; `prompt.submit` only reads the first prompt for the topic and
-  passes it on unchanged; `prompt.autocomplete` adds `/nametag` options to the
-  typeahead; `session.end` keeps the name across `/clear` and `/relaunch`.
+  `/model`; `session.end` keeps the name across `/clear` and `/relaunch`.
 - **What it stores:** a small record per session in the mod's own store on
   this machine: session id, folder path, number, color, name, topic, last
   heartbeat; plus your settings and saved templates. Ended sessions are

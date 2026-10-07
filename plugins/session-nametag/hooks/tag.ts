@@ -18,7 +18,7 @@ export type PresetName = (typeof PRESET_ORDER)[number]
 export const PRESETS: Record<PresetName, string> = {
   compact: '{folder}{ #nth}',
   branch: '{folder}{/branch}{ #nth}',
-  status: '{sigil }{folder}{/branch}{dirty}{ ↑ahead}{ #nth}{ · topic}',
+  status: '{sigil }{folder}{/branch}{ #nth}{ · topic}',
   host: '{folder}{/branch}{ #nth}{ @ host}',
   model: '{[model] }{folder}{/branch}{ #nth}{ @ host}',
   timed: '{[model] }{folder}{/branch}{ #nth}{ @ host}{ day time}',
@@ -65,16 +65,10 @@ export type TagValues = {
   startedAt: number
   /** When the name last changed for a reason other than this time itself. */
   updatedAt: number
-  /** What the session is about: from the first prompt, or /nametag topic. */
+  /** What the session is about, set by /nametag topic. */
   topic?: string
-  /** Uncommitted changes in the working tree. */
-  isDirty?: boolean
-  /** Commits not pushed to the upstream branch. */
-  ahead?: number
   /** The origin remote as owner/name. */
   remote?: string
-  /** The last commit's subject, shortened. */
-  lastcommit?: string
   /** Two words that stay with the session for life. */
   codename?: string
   /** The folder's emoji. */
@@ -85,7 +79,7 @@ export type TagValues = {
 
 /** The token names a template may use. */
 export const TOKENS = [
-  'model', 'family', 'folder', 'dir', 'remote', 'branch', 'dirty', 'ahead', 'lastcommit', 'num', 'nth', 'host',
+  'model', 'family', 'folder', 'dir', 'remote', 'branch', 'num', 'nth', 'host',
   'topic', 'codename', 'sigil', 'todaycount',
   'datetime', 'date', 'day', 'time', 'updated', 'updateddatetime', 'updateddate',
 ] as const
@@ -100,11 +94,8 @@ export const TOKEN_HELP: Record<Token, string> = {
   dir: 'the folder the session started in',
   branch: 'git branch; the group hides outside git',
   remote: 'the origin remote, e.g. lperezmo/hess-trading',
-  dirty: '* when there are uncommitted changes',
-  ahead: 'commits not pushed yet; hidden at 0',
-  lastcommit: 'the last commit message, shortened',
   nth: 'instance number; hidden for the first session in a folder',
-  topic: 'what the session is about: the first prompt, or /nametag topic <text>',
+  topic: 'what the session is about, set with /nametag topic <text>',
   codename: 'two words that stay with the session, e.g. brisk-otter',
   sigil: 'the folder emoji (/nametag sigil <emoji> picks one)',
   todaycount: 'which session this is today on this machine, e.g. 7',
@@ -125,8 +116,6 @@ export const SNIPPETS: readonly { text: string; token: Token }[] = [
   { text: '{[family] }', token: 'family' },
   { text: '{/branch}', token: 'branch' },
   { text: '{ #nth}', token: 'nth' },
-  { text: '{dirty}', token: 'dirty' },
-  { text: '{ ↑ahead}', token: 'ahead' },
   { text: '{ · topic}', token: 'topic' },
   { text: '{sigil }', token: 'sigil' },
   { text: '{ #todaycount today}', token: 'todaycount' },
@@ -293,9 +282,6 @@ export function render(template: string, v: TagValues): string {
       case 'branch': return v.branch
       case 'nth': return v.n > 1 ? String(v.n) : ''
       case 'remote': return v.remote ?? ''
-      case 'dirty': return v.isDirty ? '*' : ''
-      case 'ahead': return v.ahead ? String(v.ahead) : ''
-      case 'lastcommit': return v.lastcommit ?? ''
       case 'topic': return v.topic ?? ''
       case 'codename': return v.codename ?? ''
       case 'sigil': return v.sigil ?? ''
@@ -448,7 +434,7 @@ export type LiveEntry = {
   updatedAt?: number
   /** The folder /nametag force pinned the session to; absent, where it started. */
   root?: string
-  /** What the session is about; set from the first prompt or by /nametag topic. */
+  /** What the session is about, set by /nametag topic. */
   topic?: string
   /** True once /nametag topic set it by hand (or switched it off). */
   isTopicSet?: boolean
@@ -468,7 +454,7 @@ export type SeenEntry = {
   at: number
   updatedAt?: number
   root?: string
-  /** What the session is about; set from the first prompt or by /nametag topic. */
+  /** What the session is about, set by /nametag topic. */
   topic?: string
   /** True once /nametag topic set it by hand (or switched it off). */
   isTopicSet?: boolean
@@ -665,7 +651,7 @@ export type Parsed =
   | { kind: 'save'; name: string; template: string | null }
   | { kind: 'delete'; name: string }
   | { kind: 'named'; name: string }
-  | { kind: 'topic'; mode: 'set' | 'auto' | 'off' | 'show'; text: string }
+  | { kind: 'topic'; mode: 'set' | 'off' | 'show'; text: string }
   | { kind: 'sigil'; emoji: string | null }
   | { kind: 'error'; text: string }
 
@@ -679,13 +665,13 @@ export const USAGE = [
   '  /nametag save <name>      keep the template in use under a name; /nametag <name> brings it back',
   '  /nametag save <name> <text>  save that template under the name and use it',
   '  /nametag delete <name>    forget a saved template',
-  '  /nametag topic <text>     set what this session is about (topic auto: from the next prompt; topic off: none)',
+  '  /nametag topic <text>     set what this session is about (topic off: none)',
   '  /nametag sigil <emoji>    pick the emoji for this folder (sigil auto: back to the one it was given)',
   '  /nametag force            tag this session for the folder the shell is in now, even a resumed or renamed one',
   '  /nametag color <c>        auto (per folder), off, or one of: ' + COLORS.join(', '),
   '  /nametag off [here]       stop naming new sessions (here = only in this folder)',
   '  /nametag on [here]        start again',
-  'Tokens (type { after /nametag template to pick one):',
+  'Tokens:',
   ...TOKENS.map((t) => '  ' + t.padEnd(9) + ' ' + TOKEN_HELP[t]),
   'A {group} with an empty token disappears, so {/branch} hides outside git and { #n} hides for the first session in a folder.',
 ].join('\n')
@@ -698,7 +684,7 @@ export const SUBCOMMANDS: readonly { name: string; description: string }[] = [
   { name: 'template', description: 'your own template; type { for the tokens' },
   { name: 'save', description: 'keep the template in use under a name' },
   { name: 'delete', description: 'forget a saved template' },
-  { name: 'topic', description: 'set what this session is about (auto, off)' },
+  { name: 'topic', description: 'set what this session is about (off clears it)' },
   { name: 'sigil', description: 'pick this folder emoji (auto)' },
   { name: 'force', description: 'tag this session for the folder you are in now' },
   { name: 'color', description: 'auto, off, or a fixed color' },
@@ -865,8 +851,8 @@ export function parseArgs(args: string): Parsed {
       return { kind: 'topic', mode: 'show', text: '' }
     }
 
-    if (lower === 'auto' || lower === 'off') {
-      return { kind: 'topic', mode: lower, text: '' }
+    if (lower === 'off') {
+      return { kind: 'topic', mode: 'off', text: '' }
     }
 
     return { kind: 'topic', mode: 'set', text: tail }

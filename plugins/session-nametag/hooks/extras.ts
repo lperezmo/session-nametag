@@ -1,19 +1,9 @@
 /**
- * Pure helpers for the tokens beyond place and time: topic, git status,
- * remote, codename, sigil and today's count. Nothing here takes `$`.
+ * Pure helpers for the tokens beyond place and time: git files, remote,
+ * codename, sigil and today's count. Nothing here takes `$`.
  */
 
 import { hash } from './tag'
-
-/** Words a prompt often opens with that say nothing about its subject. */
-const FILLER = new Set([
-  'a', 'an', 'the', 'please', 'pls', 'plz', 'hey', 'hi', 'hello', 'ok', 'okay', 'so', 'um', 'uh', 'yo',
-  'can', 'could', 'would', 'will', 'you', 'u', 'we', 'i', 'me', 'us', 'lets', "let's", 'let', 'want', 'wanna',
-  'need', 'to', 'like', "i'd", 'id', 'help', 'just', 'quickly', 'go', 'ahead', 'and', 'now', 'claude',
-])
-
-const TOPIC_WORDS = 5
-const TOPIC_MAX = 28
 
 /**
  * Cuts text to a length on a word boundary, with an ellipsis when it was cut.
@@ -35,74 +25,65 @@ export function shorten(text: string, max: number): string {
 }
 
 /**
- * A short subject from a prompt: its first few meaningful words, with
- * greetings, politeness, paths, links and code left out. Empty for a slash
- * command, a shell line, or a prompt with nothing usable in it.
+ * The branch named by a repository's HEAD file: the branch, or the short
+ * commit when detached; empty when HEAD says neither.
  *
- * @param prompt the person's prompt
+ * @param head the HEAD file's text
  */
-export function topicFrom(prompt: string): string {
-  const text = prompt.trim()
+export function branchFromHead(head: string): string {
+  const text = head.trim()
+  const ref = /^ref:\s*refs\/heads\/(.+)$/.exec(text)
 
-  if (!text || text.startsWith('/') || text.startsWith('!')) {
+  if (ref) {
+    return (ref[1] ?? '').trim()
+  }
+
+  return /^[0-9a-f]{7,}$/i.test(text) ? text.slice(0, 7) : ''
+}
+
+/**
+ * Where a `.git` file points: a worktree's or submodule's `.git` is a file
+ * reading `gitdir: <path>`, relative to the folder holding it or absolute.
+ * Empty when the text is not that.
+ *
+ * @param text the `.git` file's text
+ * @param dir the folder holding the `.git` file
+ */
+export function gitDirFromFile(text: string, dir: string): string {
+  const match = /^gitdir:\s*(.+)$/m.exec(text)
+  const target = (match?.[1] ?? '').trim()
+
+  if (!target) {
     return ''
   }
 
-  const words = text
-    .replace(/```[\s\S]*?```/g, ' ')
-    .replace(/`[^`]*`/g, ' ')
-    .replace(/https?:\/\/\S+/g, ' ')
-    .split(/\s+/)
-    .filter((w) => !/[\\/]/.test(w))
-    .map((w) => w.replace(/^[^\p{L}\p{N}]+|[^\p{L}\p{N}]+$/gu, ''))
-    .filter(Boolean)
-
-  let start = 0
-
-  while (start < words.length && FILLER.has((words[start] ?? '').toLowerCase())) {
-    start++
-  }
-
-  const picked = words.slice(start, start + TOPIC_WORDS)
-
-  return picked.length ? shorten(picked.join(' ').toLowerCase(), TOPIC_MAX) : ''
+  return /^([a-z]:)?[\\/]/i.test(target) ? target : dir + '/' + target
 }
 
-/** What one `git status --porcelain=v2 --branch` says. */
-export type GitState = { branch: string; isDirty: boolean; ahead: number }
-
 /**
- * Reads `git status --porcelain=v2 --branch`: the branch (the short commit
- * when detached), whether anything is uncommitted, and how far ahead of the
- * upstream branch it is.
+ * The `origin` remote's URL from a repository's config file; empty when it
+ * has none.
  *
- * @param out the command's output
+ * @param config the config file's text
  */
-export function parseGitStatus(out: string): GitState {
-  let branch = ''
-  let oid = ''
-  let ahead = 0
-  let isDirty = false
+export function originFromConfig(config: string): string {
+  let isOrigin = false
 
-  for (const line of out.split(/\r?\n/)) {
-    if (line.startsWith('# branch.head ')) {
-      branch = line.slice('# branch.head '.length).trim()
-    } else if (line.startsWith('# branch.oid ')) {
-      oid = line.slice('# branch.oid '.length).trim()
-    } else if (line.startsWith('# branch.ab ')) {
-      const match = /\+(\d+)/.exec(line)
+  for (const raw of config.split(/\r?\n/)) {
+    const line = raw.trim()
 
-      ahead = match ? Number(match[1]) : 0
-    } else if (line && !line.startsWith('#')) {
-      isDirty = true
+    if (line.startsWith('[')) {
+      isOrigin = /^\[remote\s+"origin"\]$/.test(line)
+    } else if (isOrigin) {
+      const match = /^url\s*=\s*(.+)$/.exec(line)
+
+      if (match) {
+        return (match[1] ?? '').trim()
+      }
     }
   }
 
-  if (branch === '(detached)') {
-    branch = oid && oid !== '(initial)' ? oid.slice(0, 7) : ''
-  }
-
-  return { branch, isDirty, ahead }
+  return ''
 }
 
 /**

@@ -47,7 +47,6 @@ import {
   resolveTemplate,
   SEEN_PREFIX,
   SEEN_TTL_MS,
-  suggest,
   USAGE,
   type Config,
   type LiveEntry,
@@ -55,7 +54,7 @@ import {
   type Token,
   usedTokens,
 } from './tag'
-import { codenameFor, dayKey, parseGitStatus, remoteSlug, shorten, sigilFor, topicFrom, type GitState } from './extras'
+import { branchFromHead, codenameFor, dayKey, gitDirFromFile, originFromConfig, remoteSlug, shorten, sigilFor } from './extras'
 
 const COMMAND_NAME = 'nametag'
 
@@ -66,8 +65,6 @@ const RUN_RETRY_MS = 500
 
 /** `$.command.run` inside a hook that holds a turn or command is refused, so it waits a beat. */
 const DEFER_MS = 300
-
-const GIT_TIMEOUT_MS = 3000
 
 /** This session's live entry; null when the mod is not tagging it. */
 let me: LiveEntry | null = null
@@ -121,8 +118,8 @@ async function others($: EngineInterface, selfId: string): Promise<LiveEntry[]> 
 }
 
 /**
- * The machine's name: the environment first, then /etc/hostname, then the
- * `hostname` program.
+ * The machine's name: the environment first, then /etc/hostname; empty when
+ * neither has it, and the host group hides.
  *
  * @param $ the engine interface
  */
@@ -140,69 +137,86 @@ async function hostName($: EngineInterface): Promise<string> {
       return text.trim()
     }
   } catch {
-    // Not Linux, or not readable; ask the program.
+    // Not Linux, or not readable.
   }
 
-  try {
-    const run = await $.process.run(['hostname'], { timeoutMs: GIT_TIMEOUT_MS })
+  return ''
+}
 
-    return run.exitCode === 0 ? run.stdout.trim() : ''
+/** A git repository as its files show it: its top folder and its git folder. */
+type Repo = { top: string; gitDir: string }
+
+/**
+ * A file's text, or empty when it is missing or not a file.
+ *
+ * @param $ the engine interface
+ * @param path the file
+ */
+async function readText($: EngineInterface, path: string): Promise<string> {
+  try {
+    const text = await $.fs.read(path, { as: 'text' })
+
+    return typeof text === 'string' ? text : ''
   } catch {
     return ''
   }
 }
 
 /**
- * The top folder of the git repository holding a folder; empty outside git.
+ * The git repository holding a folder, found by walking up to the nearest
+ * `.git`; null outside git. Reads files only: no git program runs.
  *
  * @param $ the engine interface
- * @param cwd the folder
+ * @param folder the folder
  */
-async function repoTop($: EngineInterface, cwd: string): Promise<string> {
-  try {
-    const run = await $.process.run(['git', 'rev-parse', '--show-toplevel'], { cwd, timeoutMs: GIT_TIMEOUT_MS })
+async function findRepo($: EngineInterface, folder: string): Promise<Repo | null> {
+  let dir = folder.replace(/[\\/]+$/, '')
 
-    return run.exitCode === 0 ? run.stdout.trim() : ''
-  } catch {
-    return ''
+  while (dir) {
+    const dotGit = dir + '/.git'
+
+    if (await $.fs.exists(dotGit)) {
+      // A folder in a plain clone; a file pointing elsewhere in a worktree.
+      const text = await readText($, dotGit)
+      const gitDir = text ? gitDirFromFile(text, dir) : dotGit
+
+      return gitDir ? { top: dir, gitDir } : null
+    }
+
+    const up = dir.replace(/[\\/][^\\/]*$/, '')
+
+    if (up === dir) {
+      break
+    }
+
+    dir = up
   }
+
+  return null
 }
 
 /**
- * Branch, uncommitted changes and unpushed commits in one git call; all empty
- * outside git.
+ * The branch checked out, from the repository's HEAD file.
  *
  * @param $ the engine interface
- * @param cwd where to ask
+ * @param repo the repository
  */
-async function gitState($: EngineInterface, cwd: string): Promise<GitState> {
-  try {
-    const run = await $.process.run(['git', 'status', '--porcelain=v2', '--branch'], { cwd, timeoutMs: GIT_TIMEOUT_MS })
-
-    return run.exitCode === 0 ? parseGitStatus(run.stdout) : { branch: '', isDirty: false, ahead: 0 }
-  } catch {
-    return { branch: '', isDirty: false, ahead: 0 }
-  }
+async function readBranch($: EngineInterface, repo: Repo): Promise<string> {
+  return branchFromHead(await readText($, repo.gitDir + '/HEAD'))
 }
 
 /**
- * The origin remote's URL, or the last commit's subject: one line of git
- * output, empty when git has none.
+ * The origin remote's URL, from the repository's config file (a worktree's
+ * config lives in the main repository, named by its commondir file).
  *
  * @param $ the engine interface
- * @param cwd where to ask
- * @param what which line
+ * @param repo the repository
  */
-async function gitLine($: EngineInterface, cwd: string, what: 'remote' | 'lastcommit'): Promise<string> {
-  try {
-    const run = what === 'remote'
-      ? await $.process.run(['git', 'remote', 'get-url', 'origin'], { cwd, timeoutMs: GIT_TIMEOUT_MS })
-      : await $.process.run(['git', 'log', '-1', '--format=%s'], { cwd, timeoutMs: GIT_TIMEOUT_MS })
+async function readOrigin($: EngineInterface, repo: Repo): Promise<string> {
+  const common = (await readText($, repo.gitDir + '/commondir')).trim()
+  const shared = !common ? repo.gitDir : /^([a-z]:)?[\\/]/i.test(common) ? common : repo.gitDir + '/' + common
 
-    return run.exitCode === 0 ? run.stdout.trim() : ''
-  } catch {
-    return ''
-  }
+  return originFromConfig(await readText($, shared + '/config'))
 }
 
 /**
@@ -225,30 +239,22 @@ async function values($: EngineInterface, n: number, at?: string, isAll = false)
   const repo = await $.session.repo()
   // The repository follows the shell's current folder, which moves when a
   // tool cds somewhere; only one that holds the session's own folder counts.
-  let inRepo = repo !== null && isWithin(root, repo.root)
-  let project = inRepo && repo ? repo.root : root
-
-  if (!inRepo) {
-    // The shell is somewhere else: ask git about the session's own folder.
-    const top = await repoTop($, root)
-
-    if (top) {
-      inRepo = true
-      project = top
-    }
-  }
+  const isShellRepo = repo !== null && isWithin(root, repo.root)
+  // The session's own repository, from its files.
+  const found = await findRepo($, root)
+  const project = isShellRepo && repo ? repo.root : (found?.top ?? root)
 
   if (!fixed) {
     fixed = { host: await hostName($), startedAt: (await $.session.usage()).startedAt }
   }
 
   const key = folderKey(project)
-  const git = inRepo && wants('branch', 'dirty', 'ahead') ? await gitState($, root) : { branch: '', isDirty: false, ahead: 0 }
+  const branch = found && wants('branch') ? await readBranch($, found) : ''
   let remote = ''
 
-  if (inRepo && wants('remote')) {
+  if (found && wants('remote')) {
     // The engine's remote is for the shell's repository; trust it only when that is this one.
-    const url = repo && folderKey(repo.root) === key && repo.remote ? repo.remote : await gitLine($, root, 'remote')
+    const url = repo && folderKey(repo.root) === key && repo.remote ? repo.remote : await readOrigin($, found)
 
     remote = url ? remoteSlug(url) : ''
   }
@@ -257,11 +263,8 @@ async function values($: EngineInterface, n: number, at?: string, isAll = false)
     model: modelLabel(await $.session.model()),
     folder: baseName(project),
     dir: baseName(root),
-    branch: git.branch,
-    isDirty: git.isDirty,
-    ahead: git.ahead,
+    branch,
     remote,
-    lastcommit: inRepo && wants('lastcommit') ? shorten(await gitLine($, root, 'lastcommit'), 40) : '',
     n,
     host: fixed.host,
     startedAt: fixed.startedAt,
@@ -614,33 +617,6 @@ export function register(on: On) {
     return result
   })
 
-  // The typeahead under the prompt while /nametag is typed: options, colors,
-  // and the template tokens once a { is typed.
-  on('prompt.autocomplete', async ($, e, next) => {
-    const result = await next(e)
-    const mine = e.text.toLowerCase().startsWith('/nametag ') ? suggest(e.text, e.token, e.start, (await readConfig($)).saved) : []
-
-    return mine.length ? { suggestions: [...result.suggestions, ...mine] } : result
-  })
-
-  // The topic, when not set by hand: the first prompt that has one. The
-  // rename follows at the end of that turn with the rest.
-  on('prompt.submit', async ($, e, next) => {
-    const result = await next(e)
-    const kind = e.origin?.kind
-
-    if (me && !me.topic && !me.isTopicSet && (kind === 'composer' || kind === 'bridge')) {
-      const topic = topicFrom(e.text)
-
-      if (topic) {
-        me = { ...me, topic }
-        await save($, me)
-      }
-    }
-
-    return result
-  })
-
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
 
@@ -749,11 +725,11 @@ export function register(on: On) {
 
         me = parsed.mode === 'set'
           ? { ...me, topic: shorten(parsed.text, 40), isTopicSet: true }
-          : { ...me, topic: '', isTopicSet: parsed.mode === 'off' }
+          : { ...me, topic: '', isTopicSet: true }
         await save($, me)
         await refresh($)
 
-        return { text: parsed.mode === 'set' ? `Topic: ${me.topic}` : parsed.mode === 'auto' ? 'The next prompt sets the topic.' : 'No topic for this session.' }
+        return { text: parsed.mode === 'set' ? `Topic: ${me.topic}` : 'No topic for this session.' }
       }
       case 'sigil': {
         const config = await readConfig($)

@@ -1,6 +1,6 @@
 import { describe, expect, test, tier } from 'claude-code/testing'
 
-import { codenameFor, dayKey, parseGitStatus, remoteSlug, shorten, sigilFor, SIGILS, topicFrom } from '../hooks/extras'
+import { branchFromHead, codenameFor, dayKey, gitDirFromFile, originFromConfig, remoteSlug, shorten, sigilFor, SIGILS } from '../hooks/extras'
 import { render, usedTokens, type TagValues } from '../hooks/tag'
 
 tier('user')
@@ -16,32 +16,30 @@ const V: TagValues = {
   updatedAt: new Date(2026, 9, 7, 9, 5).getTime(),
 }
 
-describe('topic', () => {
-  test('the first meaningful words of a prompt', () => {
-    expect(topicFrom('hey can you please fix the nametag color bug in register.ts')).toBe('fix the nametag color bug')
-    expect(topicFrom('Lets add Pendleton train alerts')).toBe('add pendleton train alerts')
-    expect(topicFrom('look at D:\\Python\\foo and https://x.y/z then tidy it')).toBe('look at and then tidy')
-  })
-
-  test('nothing from commands, shell lines or filler alone', () => {
-    expect(topicFrom('/model fable')).toBe('')
-    expect(topicFrom('!git status')).toBe('')
-    expect(topicFrom('hi')).toBe('')
-    expect(topicFrom('   ')).toBe('')
-  })
-
-  test('long topics are cut on a word', () => {
-    expect(topicFrom('refactor everything about the extraordinarily complicated module').length).toBeLessThanOrEqual(28)
+describe('shorten', () => {
+  test('long text is cut on a word', () => {
     expect(shorten('one two three four', 10)).toBe('one two…')
   })
 })
 
 describe('git', () => {
-  test('branch, changes and unpushed commits from one status call', () => {
-    expect(parseGitStatus('# branch.oid abc1234def\n# branch.head main\n# branch.upstream origin/main\n# branch.ab +3 -0\n1 .M N... 100644 100644 100644 a b x.ts\n')).toEqual({ branch: 'main', isDirty: true, ahead: 3 })
-    expect(parseGitStatus('# branch.oid abc1234def\n# branch.head main\n')).toEqual({ branch: 'main', isDirty: false, ahead: 0 })
-    expect(parseGitStatus('# branch.oid abc1234def\n# branch.head (detached)\n')).toEqual({ branch: 'abc1234', isDirty: false, ahead: 0 })
-    expect(parseGitStatus('? new.txt\n# branch.head x\n').isDirty).toBe(true)
+  test('the branch from HEAD, the short commit when detached', () => {
+    expect(branchFromHead('ref: refs/heads/fix/backfill\n')).toBe('fix/backfill')
+    expect(branchFromHead('abc1234def5678\n')).toBe('abc1234')
+    expect(branchFromHead('')).toBe('')
+  })
+
+  test('a worktree .git file points at its git folder', () => {
+    expect(gitDirFromFile('gitdir: D:/Python/x/.git/worktrees/y\n', 'D:/Python/y')).toBe('D:/Python/x/.git/worktrees/y')
+    expect(gitDirFromFile('gitdir: ../x/.git/worktrees/y\n', '/home/u/y')).toBe('/home/u/y/../x/.git/worktrees/y')
+    expect(gitDirFromFile('nonsense', '/a')).toBe('')
+  })
+
+  test('the origin url from the config', () => {
+    const config = '[core]\n\tbare = false\n[remote "upstream"]\n\turl = https://host/a/b\n[remote "origin"]\n\turl = git@host:owner/x.git\n\tfetch = +refs/heads/*\n'
+
+    expect(originFromConfig(config)).toBe('git@host:owner/x.git')
+    expect(originFromConfig('[core]\n')).toBe('')
   })
 
   test('remotes as owner/name', () => {
@@ -72,17 +70,17 @@ describe('identity', () => {
 
 describe('rendering the new tokens', () => {
   test('status-style names hide what is empty', () => {
-    const t = '{sigil }{folder}{/branch}{dirty}{ ↑ahead}{ #nth}{ · topic}'
+    const t = '{sigil }{folder}{/branch}{ #nth}{ · topic}'
 
-    expect(render(t, { ...V, sigil: '🦀', isDirty: true, ahead: 3, topic: 'fix pyo3 build' })).toBe('🦀 pyofiles/main* ↑3 · fix pyo3 build')
+    expect(render(t, { ...V, sigil: '🦀', topic: 'fix pyo3 build' })).toBe('🦀 pyofiles/main · fix pyo3 build')
     expect(render(t, { ...V, sigil: '🦀' })).toBe('🦀 pyofiles/main')
   })
 
-  test('remote, lastcommit, codename and todaycount', () => {
-    expect(render('{remote} {codename}{ #todaycount today} {lastcommit}', { ...V, remote: 'lperezmo/pyofiles', codename: 'brisk-otter', today: 7, lastcommit: 'Add zip' })).toBe('lperezmo/pyofiles brisk-otter #7 today Add zip')
+  test('remote, codename and todaycount', () => {
+    expect(render('{remote} {codename}{ #todaycount today}', { ...V, remote: 'lperezmo/pyofiles', codename: 'brisk-otter', today: 7 })).toBe('lperezmo/pyofiles brisk-otter #7 today')
   })
 
   test('a template names the tokens it uses', () => {
-    expect([...usedTokens('{folder}{/branch}{dirty} plain branch text')].sort()).toEqual(['branch', 'dirty', 'folder'])
+    expect([...usedTokens('{folder}{/branch}{remote} plain branch text')].sort()).toEqual(['branch', 'folder', 'remote'])
   })
 })

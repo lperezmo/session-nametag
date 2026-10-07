@@ -581,8 +581,8 @@ export function register(on: On) {
 
     await $.command.register({
       name: COMMAND_NAME,
-      description: 'Name and color this session: presets, templates, force, color, off',
-      argumentHint: '[preset|template|force|color|off|on|presets|help]',
+      description: 'Name and color this session: presets, topic, templates, force, color, off',
+      argumentHint: '[preset|default|topic|template|save|force|color|sigil|off|on|presets|help]',
     })
 
     if (!isHeartbeat) {

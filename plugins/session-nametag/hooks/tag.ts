@@ -670,7 +670,7 @@ export type Parsed =
   | { kind: 'error'; text: string }
 
 export const USAGE = [
-  'Usage: /nametag [preset|template|save|delete|force|color|off|on|presets|help]',
+  'Usage: /nametag [preset|default|topic|template|save|delete|force|color|sigil|off|on|presets|help]',
   '  /nametag                  show this session\'s tag and the live sessions',
   '  /nametag presets          preview every preset for this session',
   `  /nametag <preset>         use a preset from now on: ${PRESET_ORDER.join(', ')}`,

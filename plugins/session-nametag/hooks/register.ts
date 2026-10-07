@@ -71,6 +71,15 @@ let me: LiveEntry | null = null
 
 let isHeartbeat = false
 
+/** How often the shell's folder is looked at, to follow a `!cd` you type. */
+const FOLLOW_MS = 2000
+
+/** The shell's folder when last looked at; null until the first look. */
+let shellAt: string | null = null
+
+/** True while a main-loop turn runs: a cd then is Claude's, not yours. */
+let isTurn = false
+
 /** The host and the start time never change mid-session, so they are read once. */
 let fixed: { host: string; startedAt: number } | null = null
 
@@ -470,6 +479,56 @@ async function refresh($: EngineInterface) {
 }
 
 /**
+ * Follows a `!cd` you typed: when the shell's folder moved while no turn ran,
+ * the session is named for the new folder, as /nametag force would. A cd
+ * Claude runs during a turn is taken in when the turn ends and never renames.
+ *
+ * @param $ the engine interface
+ */
+async function followShell($: EngineInterface) {
+  if (isTurn) {
+    return
+  }
+
+  const cwd = await $.session.cwd()
+
+  if (shellAt === null || cwd === shellAt) {
+    shellAt = cwd
+
+    return
+  }
+
+  shellAt = cwd
+
+  if (!me || me.isManual || !me.title) {
+    return
+  }
+
+  const config = await readConfig($)
+  const { key } = await values($, me.n, cwd)
+
+  if (await isOff($, config, key)) {
+    return
+  }
+
+  const colorBefore = me.color
+
+  if (me.key !== key) {
+    const picked = assign(key, await others($, await $.session.id()), config.color)
+
+    me = { ...me, key, n: picked.n, color: me.color && config.color !== 'auto' ? me.color : picked.color }
+  }
+
+  me = { ...me, root: cwd }
+  await save($, me)
+  await refresh($)
+
+  if (me.color && me.color !== colorBefore) {
+    runSoon($, null, me.color)
+  }
+}
+
+/**
  * Names and colors this session now, whatever its state: /nametag force and
  * a preset change use it.
  *
@@ -599,6 +658,7 @@ export function register(on: On) {
           await save($, me)
         }
       })
+      $.clock.every(FOLLOW_MS, () => followShell($))
     }
 
     // A hot reload starts the module over mid-session: pick the entry back up
@@ -620,10 +680,20 @@ export function register(on: On) {
     return result
   })
 
+  // Only marks that a turn runs, so a cd Claude makes in it is not followed;
+  // the prompt itself is never read.
+  on('turn.start', async ($, e, next) => {
+    isTurn = true
+
+    return next(e)
+  })
+
   on('turn.complete', async ($, e, next) => {
     const result = await next(e)
 
     if (!e.agentId) {
+      isTurn = false
+      shellAt = await $.session.cwd()
       await refresh($)
     }
 

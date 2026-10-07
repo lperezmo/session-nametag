@@ -68,6 +68,7 @@ function world(on: On, opts: { stored?: Record<string, unknown>; env?: Record<st
     return { text: '' }
   })
   on('turn.complete', () => ({ text: '' }))
+  on('turn.start', ($, e) => ({ turnId: e.turnId }))
   on('ui.log', () => ({ value: undefined }))
   on('store.get', ($, e) => ({ value: store.get(e.key) }))
   on('store.set', ($, e) => {
@@ -247,6 +248,29 @@ describe('new tokens', () => {
 })
 
 describe('after the start', () => {
+  test('a cd you type renames the session; a cd Claude makes in a turn does not', async ($, on) => {
+    const w = world(on, { stored: { [CONFIG_KEY]: { template: '{folder}{/branch}', color: 'off', isOn: true, offFolders: [] } } })
+    const last = () => w.ran.filter((r) => r.startsWith('rename')).pop()
+
+    await start($, w)
+    expect(last()).toBe('rename hess-laundry/fix/backfill')
+
+    // Claude cds during a turn: taken in at the end, no rename.
+    await $.turn.start({ text: '', turnId: 't1' } as never)
+    w.session.cwd = 'D:\\Python\\session-nametag'
+    await w.clock.advance(5000)
+    await $.turn.complete({ answer: '', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer' } as never)
+    await w.clock.advance(5000)
+    expect(last()).toBe('rename hess-laundry/fix/backfill')
+
+    // You cd with ! between turns: renamed for the new folder.
+    w.session.cwd = 'D:\\Python\\hess-laundry\\src'
+    await w.clock.advance(5000)
+    w.session.cwd = 'D:\\Python\\session-nametag'
+    await w.clock.advance(5000)
+    expect(last()).toBe('rename session-nametag/fix/backfill')
+  })
+
   test('a branch switch renames after the turn, and only then', async ($, on) => {
     const w = world(on)
 

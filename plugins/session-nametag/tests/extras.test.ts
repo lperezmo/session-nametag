@@ -33,6 +33,7 @@ describe('git', () => {
     expect(gitDirFromFile('gitdir: D:/Python/x/.git/worktrees/y\n', 'D:/Python/y')).toBe('D:/Python/x/.git/worktrees/y')
     expect(gitDirFromFile('gitdir: ../x/.git/worktrees/y\n', '/home/u/y')).toBe('/home/u/y/../x/.git/worktrees/y')
     expect(gitDirFromFile('nonsense', '/a')).toBe('')
+    expect(gitDirFromFile('gitdir: /home/u/x/.git/worktrees/y', '/home/u/y')).toBe('/home/u/x/.git/worktrees/y')
   })
 
   test('the origin url from the config', () => {

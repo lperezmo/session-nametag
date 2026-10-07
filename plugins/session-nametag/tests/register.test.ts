@@ -29,24 +29,26 @@ type World = {
  * A session in hess-laundry on LUIS-DESKTOP, on Opus 5.5, in git on
  * fix/backfill, with a terminal at the prompt.
  */
-function world(on: On, opts: { stored?: Record<string, unknown>; env?: Record<string, string>; turns?: number; repoRoot?: string } = {}): World {
+function world(on: On, opts: { stored?: Record<string, unknown>; env?: Record<string, string>; turns?: number; repoRoot?: string; root?: string } = {}): World {
+  const root = opts.root ?? ROOT
   const ran: string[] = []
-  const session = { branch: 'fix/backfill', turns: opts.turns ?? 0, model: 'claude-opus-5-5', id: 'sess-b', cwd: ROOT, repoRoot: opts.repoRoot ?? ROOT }
+  const session = { branch: 'fix/backfill', turns: opts.turns ?? 0, model: 'claude-opus-5-5', id: 'sess-b', cwd: root, repoRoot: opts.repoRoot ?? root }
   const store = new Map<string, unknown>(Object.entries(opts.stored ?? {}))
 
   on('session.start', ($, e) => ({ cwd: e.cwd }))
   on('session.end', ($, e) => ({ sessionId: e.sessionId }) as never)
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('session.id', () => ({ value: session.id }))
-  on('session.root', () => ({ value: ROOT }))
+  on('session.root', () => ({ value: root }))
   on('session.repo', () => ({ value: { root: session.repoRoot, remote: null, internal: false, name: null } }))
   on('session.cwd', () => ({ value: session.cwd }))
   on('session.model', () => ({ value: session.model }))
   on('session.turns', () => ({ value: session.turns }))
   on('session.usage', () => ({ value: { startedAt: START } as never }))
   // Two repositories exist on disk: hess-laundry and session-nametag.
-  const tops = ['d:/python/hess-laundry', 'd:/python/session-nametag']
-  const norm = (path: string) => path.replace(/\\/g, '/').toLowerCase()
+  const tops = ['d:/python/hess-laundry', 'd:/python/session-nametag', '/home/luis/code/hess-laundry']
+  // The engine resolves /home/... against the drive when the tests run on Windows.
+  const norm = (path: string) => path.replace(/\\/g, '/').toLowerCase().replace(/^[a-z]:(?=\/(home|etc)\/)/, '')
   on('fs.exists', ($, e) => ({ value: tops.some((t) => norm(e.path) === `${t}/.git`) }))
   on('fs.read', ($, e) => {
     const path = norm(e.path)
@@ -57,6 +59,10 @@ function world(on: On, opts: { stored?: Record<string, unknown>; env?: Record<st
 
     if (path.endsWith('/.git/config')) {
       return { value: '[core]\n\tbare = false\n[remote "origin"]\n\turl = git@github.com:lperezmo/hess-laundry.git\n' }
+    }
+
+    if (path === '/etc/hostname') {
+      return { value: 'debian-lap\n' }
     }
 
     // A .git folder, or a file that is not there.
@@ -244,6 +250,31 @@ describe('new tokens', () => {
 
     await start($, w)
     expect(lastRename(w)).toBe('rename hess-laundry #7 today')
+  })
+})
+
+describe('linux', () => {
+  test('a session in a Linux repo: / paths, and the host from /etc/hostname', async ($, on) => {
+    // HOSTNAME is a bash variable that is not exported, so programs do not see it.
+    const w = world(on, { root: '/home/luis/code/hess-laundry/src', repoRoot: '/home/luis/code/hess-laundry', env: { COMPUTERNAME: '' } })
+
+    await $.session.start({ cwd: '/home/luis/code/hess-laundry/src', surface: 'terminal', isInteractive: true } as never)
+    await w.clock.advance(2000)
+
+    expect(w.ran[0]).toBe('rename [Opus 5.5] hess-laundry/fix/backfill @ debian-lap Wed Oct 7th, 2026 9:05 am')
+  })
+
+  test('a !cd between Linux folders renames', async ($, on) => {
+    const w = world(on, { root: '/home/luis/code/hess-laundry', env: { COMPUTERNAME: '' }, stored: { [CONFIG_KEY]: { template: '{folder}{/branch}', color: 'off', isOn: true, offFolders: [] } } })
+    const last = () => w.ran.filter((r) => r.startsWith('rename')).pop()
+
+    await $.session.start({ cwd: '/home/luis/code/hess-laundry', surface: 'terminal', isInteractive: true } as never)
+    await w.clock.advance(5000)
+    expect(last()).toBe('rename hess-laundry/fix/backfill')
+
+    w.session.cwd = '/home/luis/notes'
+    await w.clock.advance(5000)
+    expect(last()).toBe('rename notes')
   })
 })
 

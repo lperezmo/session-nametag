@@ -134,7 +134,7 @@ export const SNIPPETS: readonly { text: string; token: Token }[] = [
   { text: '{ · updated}', token: 'updated' },
 ]
 
-const TOKEN_RE = new RegExp(`(?<![A-Za-z])(${TOKENS.join('|')})(?![A-Za-z])`, 'g')
+const TOKEN_RE = new RegExp('(?<![A-Za-z])(' + TOKENS.join('|') + ')(?![A-Za-z])', 'g')
 
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -686,7 +686,7 @@ export const USAGE = [
   '  /nametag off [here]       stop naming new sessions (here = only in this folder)',
   '  /nametag on [here]        start again',
   'Tokens (type { after /nametag template to pick one):',
-  ...TOKENS.map((t) => `  ${t.padEnd(9)} ${TOKEN_HELP[t]}`),
+  ...TOKENS.map((t) => '  ' + t.padEnd(9) + ' ' + TOKEN_HELP[t]),
   'A {group} with an empty token disappears, so {/branch} hides outside git and { #n} hides for the first session in a folder.',
 ].join('\n')
 

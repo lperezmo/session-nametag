@@ -22,7 +22,7 @@ export const PRESETS: Record<PresetName, string> = {
   host: '{folder}{/branch}{ #nth}{ @ host}',
   model: '{[model] }{folder}{/branch}{ #nth}{ @ host}',
   timed: '{[model] }{folder}{/branch}{ #nth}{ @ host}{ day time}',
-  full: '{[model] }{folder}{/branch}{ #nth}{ @ host}{ datetime}',
+  full: '{[model] }{folder}{/branch}{ #nth}{ · topic}{ @ host}{ datetime}',
 }
 
 /**

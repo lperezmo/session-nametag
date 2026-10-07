@@ -5,7 +5,7 @@ desktop full of sessions (and the Remote Control list on your phone) is easy
 to tell apart.
 
 ```
-/rename [Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am
+/rename [Opus 5.5] hess-laundry/fix/backfill #2 · fix the backfill script @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am
 /color pink
 ```
 
@@ -41,7 +41,7 @@ branch only shows inside git.
 | `host` | `hess-laundry/fix/backfill #2 @ LUIS-DESKTOP` |
 | `model` | `[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP` |
 | `timed` | `[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP Wed 9:05 am` |
-| `full` (default) | `[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am` |
+| `full` (default) | `[Opus 5.5] hess-laundry/fix/backfill #2 · fix the backfill script @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am` |
 
 ## Your own template
 

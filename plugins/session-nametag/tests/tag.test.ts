@@ -55,6 +55,7 @@ describe('render', () => {
 
   test('a group with an empty token disappears', () => {
     expect(render(PRESETS.full, { ...V, n: 1, branch: '' })).toBe('[Opus 5.5] hess-laundry @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am')
+    expect(render(PRESETS.full, { ...V, topic: 'fix the backfill script' })).toBe('[Opus 5.5] hess-laundry/fix/backfill #2 · fix the backfill script @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am')
   })
 
   test('num always shows, nth hides the first instance', () => {

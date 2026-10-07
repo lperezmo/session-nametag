@@ -208,6 +208,19 @@ export function folderKey(path: string): string {
 }
 
 /**
+ * Whether a folder is the other one or inside it, either separator, any case.
+ *
+ * @param child the folder that may be inside
+ * @param parent the folder that may hold it
+ */
+export function isWithin(child: string, parent: string): boolean {
+  const c = folderKey(child)
+  const p = folderKey(parent)
+
+  return c === p || c.startsWith(`${p}/`)
+}
+
+/**
  * Fills a template. Each `{...}` group holds one or more tokens plus any
  * literal text around them, and the whole group is dropped when one of its
  * tokens is empty: `{/branch}` vanishes outside git, `{ #n}` vanishes for the

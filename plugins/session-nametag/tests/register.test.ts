@@ -28,7 +28,7 @@ type World = {
  * A session in hess-laundry on LUIS-DESKTOP, on Opus 5.5, in git on
  * fix/backfill, with a terminal at the prompt.
  */
-function world(on: On, opts: { stored?: Record<string, unknown>; env?: Record<string, string>; turns?: number } = {}): World {
+function world(on: On, opts: { stored?: Record<string, unknown>; env?: Record<string, string>; turns?: number; repoRoot?: string } = {}): World {
   const ran: string[] = []
   const session = { branch: 'fix/backfill', turns: opts.turns ?? 0, model: 'claude-opus-5-5', id: 'sess-b' }
   const store = new Map<string, unknown>(Object.entries(opts.stored ?? {}))
@@ -38,7 +38,7 @@ function world(on: On, opts: { stored?: Record<string, unknown>; env?: Record<st
   on('command.register', ($, e) => ({ value: { command: e.name } }))
   on('session.id', () => ({ value: session.id }))
   on('session.root', () => ({ value: ROOT }))
-  on('session.repo', () => ({ value: { root: ROOT, remote: null, internal: false, name: null } }))
+  on('session.repo', () => ({ value: { root: opts.repoRoot ?? ROOT, remote: null, internal: false, name: null } }))
   on('session.model', () => ({ value: session.model }))
   on('session.turns', () => ({ value: session.turns }))
   on('session.usage', () => ({ value: { startedAt: START } as never }))
@@ -156,6 +156,24 @@ describe('session start', () => {
     await w.clock.advance(1000)
 
     expect(w.ran.some((r) => r.startsWith('rename'))).toBe(false)
+  })
+})
+
+describe('folders', () => {
+  test('a repository the shell moved into does not rename the session', async ($, on) => {
+    const w = world(on, { repoRoot: 'D:/Python/other-repo' })
+
+    await start($, w)
+
+    expect(w.ran[0]).toBe('rename [Opus 5.5] hess-laundry @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am')
+  })
+
+  test('a session started in a subfolder is named after its repository', async ($, on) => {
+    const w = world(on, { repoRoot: 'D:/Python' })
+
+    await start($, w)
+
+    expect(w.ran[0]).toBe('rename [Opus 5.5] Python/fix/backfill @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am')
   })
 })
 

@@ -35,6 +35,7 @@ import {
   HEARTBEAT_MS,
   isAlive,
   isPreset,
+  isWithin,
   LIVE_PREFIX,
   modelLabel,
   mustYield,
@@ -184,7 +185,10 @@ async function branchName($: EngineInterface, cwd: string): Promise<string> {
 async function values($: EngineInterface, n: number): Promise<{ v: TagValues; key: string }> {
   const root = await $.session.root()
   const repo = await $.session.repo()
-  const project = repo?.root ?? root
+  // The repository follows the shell's current folder, which moves when a
+  // tool cds somewhere; only one that holds the session's own folder counts.
+  const inRepo = repo !== null && isWithin(root, repo.root)
+  const project = inRepo ? repo.root : root
 
   if (!fixed) {
     fixed = { host: await hostName($), startedAt: (await $.session.usage()).startedAt }
@@ -194,7 +198,7 @@ async function values($: EngineInterface, n: number): Promise<{ v: TagValues; ke
     model: modelLabel(await $.session.model()),
     folder: baseName(project),
     dir: baseName(root),
-    branch: repo ? await branchName($, root) : '',
+    branch: inRepo ? await branchName($, root) : '',
     n,
     host: fixed.host,
     startedAt: fixed.startedAt,

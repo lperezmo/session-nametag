@@ -50,12 +50,18 @@ describe('render', () => {
     expect(render(PRESETS.host, V)).toBe('hess-laundry/fix/backfill #2 @ LUIS-DESKTOP')
     expect(render(PRESETS.model, V)).toBe('[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP')
     expect(render(PRESETS.timed, V)).toBe('[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP Wed 9:05 am')
-    expect(render(PRESETS.full, V)).toBe('[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am')
+    expect(render(PRESETS.full, V)).toBe(
+      '[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am',
+    )
   })
 
   test('a group with an empty token disappears', () => {
-    expect(render(PRESETS.full, { ...V, n: 1, branch: '' })).toBe('[Opus 5.5] hess-laundry @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am')
-    expect(render(PRESETS.full, { ...V, topic: 'fix the backfill script' })).toBe('[Opus 5.5] hess-laundry/fix/backfill #2 · fix the backfill script @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am')
+    expect(render(PRESETS.full, { ...V, n: 1, branch: '' })).toBe(
+      '[Opus 5.5] hess-laundry @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am',
+    )
+    expect(render(PRESETS.full, { ...V, topic: 'fix the backfill script' })).toBe(
+      '[Opus 5.5] hess-laundry/fix/backfill #2 · fix the backfill script @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am',
+    )
   })
 
   test('num always shows, nth hides the first instance', () => {
@@ -91,12 +97,26 @@ describe('labels', () => {
     expect(render('{folder}{ (updated)}', { ...V, updatedAt: START + 3 * 3600_000 })).toBe('hess-laundry (12:05 pm)')
     const nextDay = { ...V, updatedAt: START + 26 * 3600_000 }
 
-    expect(render('{folder} {datetime} · {updateddatetime}', nextDay)).toBe('hess-laundry Wed Oct 7th, 2026 9:05 am · Thu Oct 8th, 2026 11:05 am')
+    expect(render('{folder} {datetime} · {updateddatetime}', nextDay)).toBe(
+      'hess-laundry Wed Oct 7th, 2026 9:05 am · Thu Oct 8th, 2026 11:05 am',
+    )
     expect(render('{updateddate}', nextDay)).toBe('Oct 8th, 2026')
   })
 
   test('ordinals', () => {
-    expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 31].map(ordinal)).toEqual(['1st', '2nd', '3rd', '4th', '11th', '12th', '13th', '21st', '22nd', '23rd', '31st'])
+    expect([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 31].map(ordinal)).toEqual([
+      '1st',
+      '2nd',
+      '3rd',
+      '4th',
+      '11th',
+      '12th',
+      '13th',
+      '21st',
+      '22nd',
+      '23rd',
+      '31st',
+    ])
   })
 
   test('paths', () => {
@@ -145,7 +165,14 @@ describe('picking', () => {
 
 describe('config', () => {
   test('defaults fill what is missing', () => {
-    expect(asConfig(undefined)).toEqual({ template: 'full', color: 'auto', isOn: true, offFolders: [], saved: {}, sigils: {} })
+    expect(asConfig(undefined)).toEqual({
+      template: 'full',
+      color: 'auto',
+      isOn: true,
+      offFolders: [],
+      saved: {},
+      sigils: {},
+    })
     expect(asConfig({ template: 'compact', isOn: false }).template).toBe('compact')
   })
 })
@@ -178,7 +205,11 @@ describe('parseArgs', () => {
 
   test('save and delete', () => {
     expect(parseArgs('save Work')).toEqual({ kind: 'save', name: 'work', template: null })
-    expect(parseArgs('save work {family} {folder}')).toEqual({ kind: 'save', name: 'work', template: '{family} {folder}' })
+    expect(parseArgs('save work {family} {folder}')).toEqual({
+      kind: 'save',
+      name: 'work',
+      template: '{family} {folder}',
+    })
     expect(parseArgs('save full').kind).toBe('error')
     expect(parseArgs('save color').kind).toBe('error')
     expect(parseArgs('save a/b').kind).toBe('error')
@@ -189,7 +220,9 @@ describe('parseArgs', () => {
   test('saved templates resolve by name, presets win', () => {
     expect(resolveTemplate('work', { work: '{folder}' })).toBe('{folder}')
     expect(resolveTemplate('toString', {})).toBe('toString')
-    expect(asConfig({ saved: { work: '{folder}', full: 'x', 'Bad Name': 'y', empty: ' ' } }).saved).toEqual({ work: '{folder}' })
+    expect(asConfig({ saved: { work: '{folder}', full: 'x', 'Bad Name': 'y', empty: ' ' } }).saved).toEqual({
+      work: '{folder}',
+    })
   })
 })
 
@@ -241,4 +274,3 @@ describe('typeahead', () => {
     expect(render('{family}', V)).toBe('Opus')
   })
 })
-

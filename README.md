@@ -35,14 +35,14 @@ Mods need `CLAUDE_CODE_ENABLE_FUNCTION_HOOKS=1`.
 `#2` only shows when a second session is open in the same folder, and the
 branch only shows inside git.
 
-| Preset | Example |
-|---|---|
-| `compact` | `hess-laundry #2` |
-| `branch` | `hess-laundry/fix/backfill #2` |
-| `status` | `🧺 hess-laundry/fix/backfill #2 · fix the backfill script` |
-| `host` | `hess-laundry/fix/backfill #2 @ LUIS-DESKTOP` |
-| `model` | `[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP` |
-| `timed` | `[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP Wed 9:05 am` |
+| Preset           | Example                                                                                                      |
+| ---------------- | ------------------------------------------------------------------------------------------------------------ |
+| `compact`        | `hess-laundry #2`                                                                                            |
+| `branch`         | `hess-laundry/fix/backfill #2`                                                                               |
+| `status`         | `🧺 hess-laundry/fix/backfill #2 · fix the backfill script`                                                  |
+| `host`           | `hess-laundry/fix/backfill #2 @ LUIS-DESKTOP`                                                                |
+| `model`          | `[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP`                                                     |
+| `timed`          | `[Opus 5.5] hess-laundry/fix/backfill #2 @ LUIS-DESKTOP Wed 9:05 am`                                         |
 | `full` (default) | `[Opus 5.5] hess-laundry/fix/backfill #2 · fix the backfill script @ LUIS-DESKTOP Wed Oct 7th, 2026 9:05 am` |
 
 ## Your own template
@@ -53,28 +53,28 @@ branch only shows inside git.
 
 `/nametag help` lists every token.
 
-| Token | Example |
-|---|---|
-| `model` | Opus 5.5 |
-| `family` | Opus |
-| `folder` | hess-laundry (the repository, so worktrees and subfolders share it) |
-| `dir` | the folder the session started in |
-| `remote` | lperezmo/hess-laundry |
-| `branch` | fix/backfill |
-| `nth` | 2 (hidden for the first session in a folder) |
-| `num` | 1 (always shown) |
-| `host` | LUIS-DESKTOP |
-| `topic` | fix the backfill script (set with `/nametag topic`) |
-| `codename` | brisk-otter (fixed for the session) |
-| `sigil` | 🧺 (an emoji per folder) |
-| `todaycount` | 7 (the 7th session started today on this machine) |
-| `datetime` | Wed Oct 7th, 2026 9:05 am |
-| `date` | Oct 7th, 2026 |
-| `day` | Wed |
-| `time` | 9:05 am |
-| `updated` | 2:14 pm, or Thu 2:14 pm on a later day |
-| `updateddatetime` | Thu Oct 8th, 2026 11:00 am |
-| `updateddate` | Oct 8th, 2026 |
+| Token             | Example                                                             |
+| ----------------- | ------------------------------------------------------------------- |
+| `model`           | Opus 5.5                                                            |
+| `family`          | Opus                                                                |
+| `folder`          | hess-laundry (the repository, so worktrees and subfolders share it) |
+| `dir`             | the folder the session started in                                   |
+| `remote`          | lperezmo/hess-laundry                                               |
+| `branch`          | fix/backfill                                                        |
+| `nth`             | 2 (hidden for the first session in a folder)                        |
+| `num`             | 1 (always shown)                                                    |
+| `host`            | LUIS-DESKTOP                                                        |
+| `topic`           | fix the backfill script (set with `/nametag topic`)                 |
+| `codename`        | brisk-otter (fixed for the session)                                 |
+| `sigil`           | 🧺 (an emoji per folder)                                            |
+| `todaycount`      | 7 (the 7th session started today on this machine)                   |
+| `datetime`        | Wed Oct 7th, 2026 9:05 am                                           |
+| `date`            | Oct 7th, 2026                                                       |
+| `day`             | Wed                                                                 |
+| `time`            | 9:05 am                                                             |
+| `updated`         | 2:14 pm, or Thu 2:14 pm on a later day                              |
+| `updateddatetime` | Thu Oct 8th, 2026 11:00 am                                          |
+| `updateddate`     | Oct 8th, 2026                                                       |
 
 The date tokens are when the session started and never move, even when a
 branch switch renames it. The `updated` tokens are when the name last changed. Each
@@ -83,22 +83,22 @@ disappears outside git.
 
 ## Commands
 
-| Command | What it does |
-|---|---|
-| `/nametag` | This session's tag and the other live sessions |
-| `/nametag presets` | Preview every preset for this session |
-| `/nametag <preset>` | Use a preset from now on and rename this session |
-| `/nametag default` | Back to the default preset (`full`); `reset` works too |
-| `/nametag template <text>` | Use your own template |
-| `/nametag save <name> [text]` | Keep the template in use (or the one given) under a name |
-| `/nametag <name>` | Switch to a saved template |
-| `/nametag delete <name>` | Forget a saved template |
-| `/nametag topic <text>` | Set what this session is about; `off` clears it |
-| `/nametag sigil <emoji>` | Pick this folder's emoji; `auto` goes back to the one it was given |
-| `/nametag force` | Tag this session for the folder you are in now (after a `cd`), even a resumed or renamed one |
-| `/nametag color <c>` | `auto` (per folder), `off`, or a fixed color |
-| `/nametag off [here]` | Stop tagging new sessions, everywhere or in this folder |
-| `/nametag on [here]` | Start again |
+| Command                       | What it does                                                                                 |
+| ----------------------------- | -------------------------------------------------------------------------------------------- |
+| `/nametag`                    | This session's tag and the other live sessions                                               |
+| `/nametag presets`            | Preview every preset for this session                                                        |
+| `/nametag <preset>`           | Use a preset from now on and rename this session                                             |
+| `/nametag default`            | Back to the default preset (`full`); `reset` works too                                       |
+| `/nametag template <text>`    | Use your own template                                                                        |
+| `/nametag save <name> [text]` | Keep the template in use (or the one given) under a name                                     |
+| `/nametag <name>`             | Switch to a saved template                                                                   |
+| `/nametag delete <name>`      | Forget a saved template                                                                      |
+| `/nametag topic <text>`       | Set what this session is about; `off` clears it                                              |
+| `/nametag sigil <emoji>`      | Pick this folder's emoji; `auto` goes back to the one it was given                           |
+| `/nametag force`              | Tag this session for the folder you are in now (after a `cd`), even a resumed or renamed one |
+| `/nametag color <c>`          | `auto` (per folder), `off`, or a fixed color                                                 |
+| `/nametag off [here]`         | Stop tagging new sessions, everywhere or in this folder                                      |
+| `/nametag on [here]`          | Start again                                                                                  |
 
 To switch it off for a whole project, team included, set `NAMETAG_OFF=1` in
 the project's `.claude/settings.json` `env`.

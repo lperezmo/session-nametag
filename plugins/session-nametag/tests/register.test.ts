@@ -29,10 +29,26 @@ type World = {
  * A session in hess-laundry on LUIS-DESKTOP, on Opus 5.5, in git on
  * fix/backfill, with a terminal at the prompt.
  */
-function world(on: On, opts: { stored?: Record<string, unknown>; env?: Record<string, string>; turns?: number; repoRoot?: string; root?: string } = {}): World {
+function world(
+  on: On,
+  opts: {
+    stored?: Record<string, unknown>
+    env?: Record<string, string>
+    turns?: number
+    repoRoot?: string
+    root?: string
+  } = {},
+): World {
   const root = opts.root ?? ROOT
   const ran: string[] = []
-  const session = { branch: 'fix/backfill', turns: opts.turns ?? 0, model: 'claude-opus-5-5', id: 'sess-b', cwd: root, repoRoot: opts.repoRoot ?? root }
+  const session = {
+    branch: 'fix/backfill',
+    turns: opts.turns ?? 0,
+    model: 'claude-opus-5-5',
+    id: 'sess-b',
+    cwd: root,
+    repoRoot: opts.repoRoot ?? root,
+  }
   const store = new Map<string, unknown>(Object.entries(opts.stored ?? {}))
 
   on('session.start', ($, e) => ({ cwd: e.cwd }))
@@ -48,7 +64,11 @@ function world(on: On, opts: { stored?: Record<string, unknown>; env?: Record<st
   // Two repositories exist on disk: hess-laundry and session-nametag.
   const tops = ['d:/python/hess-laundry', 'd:/python/session-nametag', '/home/luis/code/hess-laundry']
   // The engine resolves /home/... against the drive when the tests run on Windows.
-  const norm = (path: string) => path.replace(/\\/g, '/').toLowerCase().replace(/^[a-z]:(?=\/(home|etc)\/)/, '')
+  const norm = (path: string) =>
+    path
+      .replace(/\\/g, '/')
+      .toLowerCase()
+      .replace(/^[a-z]:(?=\/(home|etc)\/)/, '')
   on('fs.exists', ($, e) => ({ value: tops.some((t) => norm(e.path) === `${t}/.git`) }))
   on('fs.read', ($, e) => {
     const path = norm(e.path)
@@ -111,7 +131,19 @@ describe('session start', () => {
   })
 
   test('a second session in the folder is #2 with another color', async ($, on) => {
-    const w = world(on, { stored: { [`${LIVE_PREFIX}sess-a`]: { id: 'sess-a', key: KEY, n: 1, color: 'red', at: START, title: 'x', isManual: false } } })
+    const w = world(on, {
+      stored: {
+        [`${LIVE_PREFIX}sess-a`]: {
+          id: 'sess-a',
+          key: KEY,
+          n: 1,
+          color: 'red',
+          at: START,
+          title: 'x',
+          isManual: false,
+        },
+      },
+    })
 
     await start($, w)
 
@@ -119,8 +151,20 @@ describe('session start', () => {
     expect(w.ran[1]).not.toBe('color red')
   })
 
-  test('a crashed session\'s entry is dropped and its number reused', async ($, on) => {
-    const w = world(on, { stored: { [`${LIVE_PREFIX}sess-a`]: { id: 'sess-a', key: KEY, n: 1, color: 'red', at: START - STALE_MS - 1, title: 'x', isManual: false } } })
+  test("a crashed session's entry is dropped and its number reused", async ($, on) => {
+    const w = world(on, {
+      stored: {
+        [`${LIVE_PREFIX}sess-a`]: {
+          id: 'sess-a',
+          key: KEY,
+          n: 1,
+          color: 'red',
+          at: START - STALE_MS - 1,
+          title: 'x',
+          isManual: false,
+        },
+      },
+    })
 
     await start($, w)
 
@@ -137,7 +181,9 @@ describe('session start', () => {
   })
 
   test('a folder switched off is left alone', async ($, on) => {
-    const w = world(on, { stored: { [CONFIG_KEY]: { template: 'full', color: 'auto', isOn: true, offFolders: [KEY] } } })
+    const w = world(on, {
+      stored: { [CONFIG_KEY]: { template: 'full', color: 'auto', isOn: true, offFolders: [KEY] } },
+    })
 
     await start($, w)
 
@@ -158,7 +204,12 @@ describe('session start', () => {
 
   test('a relaunched session gets its number and color back and keeps updating', async ($, on) => {
     const old = FULL.replace('hess-laundry/fix/backfill', 'hess-laundry/fix/backfill #2')
-    const w = world(on, { turns: 4, stored: { [`${SEEN_PREFIX}sess-b`]: { id: 'sess-b', n: 2, color: 'pink', title: old, isManual: false, at: START } } })
+    const w = world(on, {
+      turns: 4,
+      stored: {
+        [`${SEEN_PREFIX}sess-b`]: { id: 'sess-b', n: 2, color: 'pink', title: old, isManual: false, at: START },
+      },
+    })
 
     await start($, w)
 
@@ -172,7 +223,12 @@ describe('session start', () => {
   })
 
   test('a relaunched session renamed by hand stays as it is', async ($, on) => {
-    const w = world(on, { turns: 4, stored: { [`${SEEN_PREFIX}sess-b`]: { id: 'sess-b', n: 1, color: 'pink', title: 'mine', isManual: true, at: START } } })
+    const w = world(on, {
+      turns: 4,
+      stored: {
+        [`${SEEN_PREFIX}sess-b`]: { id: 'sess-b', n: 1, color: 'pink', title: 'mine', isManual: true, at: START },
+      },
+    })
 
     await start($, w)
     w.session.branch = 'main'
@@ -229,7 +285,6 @@ describe('force', () => {
 describe('new tokens', () => {
   const STATUS = { [CONFIG_KEY]: { template: 'status', color: 'off', isOn: true, offFolders: [] } }
   const lastRename = (w: World) => w.ran.filter((r) => r.startsWith('rename')).pop()
-  const turn = (id: string) => ({ answer: '', durationMs: 1, isAborted: false, turnId: id, reason: 'answer' }) as never
 
   test('/nametag topic sets and off clears', async ($, on) => {
     const w = world(on, { stored: STATUS })
@@ -246,7 +301,12 @@ describe('new tokens', () => {
   })
 
   test('each session started today gets the next count', async ($, on) => {
-    const w = world(on, { stored: { [CONFIG_KEY]: { template: '{folder}{ #todaycount today}', color: 'off', isOn: true, offFolders: [] }, [dayKey(START)]: 6 } })
+    const w = world(on, {
+      stored: {
+        [CONFIG_KEY]: { template: '{folder}{ #todaycount today}', color: 'off', isOn: true, offFolders: [] },
+        [dayKey(START)]: 6,
+      },
+    })
 
     await start($, w)
     expect(lastRename(w)).toBe('rename hess-laundry #7 today')
@@ -256,16 +316,28 @@ describe('new tokens', () => {
 describe('linux', () => {
   test('a session in a Linux repo: / paths, and the host from /etc/hostname', async ($, on) => {
     // HOSTNAME is a bash variable that is not exported, so programs do not see it.
-    const w = world(on, { root: '/home/luis/code/hess-laundry/src', repoRoot: '/home/luis/code/hess-laundry', env: { COMPUTERNAME: '' } })
+    const w = world(on, {
+      root: '/home/luis/code/hess-laundry/src',
+      repoRoot: '/home/luis/code/hess-laundry',
+      env: { COMPUTERNAME: '' },
+    })
 
-    await $.session.start({ cwd: '/home/luis/code/hess-laundry/src', surface: 'terminal', isInteractive: true } as never)
+    await $.session.start({
+      cwd: '/home/luis/code/hess-laundry/src',
+      surface: 'terminal',
+      isInteractive: true,
+    } as never)
     await w.clock.advance(2000)
 
     expect(w.ran[0]).toBe('rename [Opus 5.5] hess-laundry/fix/backfill @ debian-lap Wed Oct 7th, 2026 9:05 am')
   })
 
   test('a !cd between Linux folders renames', async ($, on) => {
-    const w = world(on, { root: '/home/luis/code/hess-laundry', env: { COMPUTERNAME: '' }, stored: { [CONFIG_KEY]: { template: '{folder}{/branch}', color: 'off', isOn: true, offFolders: [] } } })
+    const w = world(on, {
+      root: '/home/luis/code/hess-laundry',
+      env: { COMPUTERNAME: '' },
+      stored: { [CONFIG_KEY]: { template: '{folder}{/branch}', color: 'off', isOn: true, offFolders: [] } },
+    })
     const last = () => w.ran.filter((r) => r.startsWith('rename')).pop()
 
     await $.session.start({ cwd: '/home/luis/code/hess-laundry', surface: 'terminal', isInteractive: true } as never)
@@ -280,7 +352,9 @@ describe('linux', () => {
 
 describe('after the start', () => {
   test('a cd you type renames the session; a cd Claude makes in a turn does not', async ($, on) => {
-    const w = world(on, { stored: { [CONFIG_KEY]: { template: '{folder}{/branch}', color: 'off', isOn: true, offFolders: [] } } })
+    const w = world(on, {
+      stored: { [CONFIG_KEY]: { template: '{folder}{/branch}', color: 'off', isOn: true, offFolders: [] } },
+    })
     const last = () => w.ran.filter((r) => r.startsWith('rename')).pop()
 
     await start($, w)
@@ -325,7 +399,16 @@ describe('after the start', () => {
   })
 
   test('a rename keeps the start date and moves the updated time', async ($, on) => {
-    const w = world(on, { stored: { [CONFIG_KEY]: { template: '{folder}{/branch} {datetime}{ · updated}', color: 'off', isOn: true, offFolders: [] } } })
+    const w = world(on, {
+      stored: {
+        [CONFIG_KEY]: {
+          template: '{folder}{/branch} {datetime}{ · updated}',
+          color: 'off',
+          isOn: true,
+          offFolders: [],
+        },
+      },
+    })
 
     await start($, w)
     expect(w.ran[0]).toBe('rename hess-laundry/fix/backfill Wed Oct 7th, 2026 9:05 am · 9:05 am')
@@ -338,12 +421,19 @@ describe('after the start', () => {
     expect(w.ran[w.ran.length - 1]).toBe('rename hess-laundry/main Wed Oct 7th, 2026 9:05 am · 11:05 am')
   })
 
-  test('a subagent\'s turn does not rename', async ($, on) => {
+  test("a subagent's turn does not rename", async ($, on) => {
     const w = world(on)
 
     await start($, w)
     w.session.branch = 'main'
-    await $.turn.complete({ answer: '', durationMs: 1, isAborted: false, turnId: 't1', reason: 'answer', agentId: 'a1' } as never)
+    await $.turn.complete({
+      answer: '',
+      durationMs: 1,
+      isAborted: false,
+      turnId: 't1',
+      reason: 'answer',
+      agentId: 'a1',
+    } as never)
     await w.clock.advance(1000)
 
     expect(w.ran.filter((r) => r.startsWith('rename')).length).toBe(1)

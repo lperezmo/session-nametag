@@ -1,6 +1,17 @@
 import { describe, expect, test, tier } from 'claude-code/testing'
 
-import { branchFromHead, codenameFor, dayKey, gitDirFromFile, macHostName, originFromConfig, remoteSlug, shorten, sigilFor, SIGILS } from '../hooks/extras'
+import {
+  branchFromHead,
+  codenameFor,
+  dayKey,
+  gitDirFromFile,
+  macHostName,
+  originFromConfig,
+  remoteSlug,
+  shorten,
+  sigilFor,
+  SIGILS,
+} from '../hooks/extras'
 import { render, usedTokens, type TagValues } from '../hooks/tag'
 
 tier('user')
@@ -37,14 +48,16 @@ describe('git', () => {
   })
 
   test('the origin url from the config', () => {
-    const config = '[core]\n\tbare = false\n[remote "upstream"]\n\turl = https://host/a/b\n[remote "origin"]\n\turl = git@host:owner/x.git\n\tfetch = +refs/heads/*\n'
+    const config =
+      '[core]\n\tbare = false\n[remote "upstream"]\n\turl = https://host/a/b\n[remote "origin"]\n\turl = git@host:owner/x.git\n\tfetch = +refs/heads/*\n'
 
     expect(originFromConfig(config)).toBe('git@host:owner/x.git')
     expect(originFromConfig('[core]\n')).toBe('')
   })
 
   test('the Mac name from its system plist', () => {
-    const plist = '<dict><key>ComputerName</key>\n<string>Luis MacBook</string><key>LocalHostName</key>\n\t<string>Luis-MacBook</string></dict>'
+    const plist =
+      '<dict><key>ComputerName</key>\n<string>Luis MacBook</string><key>LocalHostName</key>\n\t<string>Luis-MacBook</string></dict>'
 
     expect(macHostName(plist)).toBe('Luis-MacBook')
     expect(macHostName('<key>ComputerName</key><string>Luis MacBook</string>')).toBe('Luis MacBook')
@@ -86,10 +99,21 @@ describe('rendering the new tokens', () => {
   })
 
   test('remote, codename and todaycount', () => {
-    expect(render('{remote} {codename}{ #todaycount today}', { ...V, remote: 'lperezmo/pyofiles', codename: 'brisk-otter', today: 7 })).toBe('lperezmo/pyofiles brisk-otter #7 today')
+    expect(
+      render('{remote} {codename}{ #todaycount today}', {
+        ...V,
+        remote: 'lperezmo/pyofiles',
+        codename: 'brisk-otter',
+        today: 7,
+      }),
+    ).toBe('lperezmo/pyofiles brisk-otter #7 today')
   })
 
   test('a template names the tokens it uses', () => {
-    expect([...usedTokens('{folder}{/branch}{remote} plain branch text')].sort()).toEqual(['branch', 'folder', 'remote'])
+    expect([...usedTokens('{folder}{/branch}{remote} plain branch text')].sort()).toEqual([
+      'branch',
+      'folder',
+      'remote',
+    ])
   })
 })

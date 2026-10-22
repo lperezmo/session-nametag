@@ -79,9 +79,26 @@ export type TagValues = {
 
 /** The token names a template may use. */
 export const TOKENS = [
-  'model', 'family', 'folder', 'dir', 'remote', 'branch', 'num', 'nth', 'host',
-  'topic', 'codename', 'sigil', 'todaycount',
-  'datetime', 'date', 'day', 'time', 'updated', 'updateddatetime', 'updateddate',
+  'model',
+  'family',
+  'folder',
+  'dir',
+  'remote',
+  'branch',
+  'num',
+  'nth',
+  'host',
+  'topic',
+  'codename',
+  'sigil',
+  'todaycount',
+  'datetime',
+  'date',
+  'day',
+  'time',
+  'updated',
+  'updateddatetime',
+  'updateddate',
 ] as const
 
 export type Token = (typeof TOKENS)[number]
@@ -100,7 +117,7 @@ export const TOKEN_HELP: Record<Token, string> = {
   sigil: 'the folder emoji (/nametag sigil <emoji> picks one)',
   todaycount: 'which session this is today on this machine, e.g. 7',
   num: 'instance number, always shown',
-  host: 'this machine\'s name',
+  host: "this machine's name",
   datetime: 'session start, e.g. Wed Oct 7th, 2026 9:05 am',
   date: 'session start date, e.g. Oct 7th, 2026',
   day: 'session start weekday, e.g. Wed',
@@ -181,7 +198,8 @@ export function dateParts(ms: number): { datetime: string; date: string; day: st
 export function updatedLabel(startedAt: number, updatedAt: number): string {
   const start = new Date(startedAt)
   const d = new Date(updatedAt)
-  const isSameDay = start.getFullYear() === d.getFullYear() && start.getMonth() === d.getMonth() && start.getDate() === d.getDate()
+  const isSameDay =
+    start.getFullYear() === d.getFullYear() && start.getMonth() === d.getMonth() && start.getDate() === d.getDate()
 
   return isSameDay ? clockTime(d) : `${DAYS[d.getDay()] ?? ''} ${clockTime(d)}`
 }
@@ -194,7 +212,12 @@ export function updatedLabel(startedAt: number, updatedAt: number): string {
  * @param id the model id or alias the session runs on
  */
 export function modelLabel(id: string): string {
-  const s = id.trim().toLowerCase().replace(/\[[^\]]*\]/g, '').replace(/^claude-/, '').replace(/-\d{8}$/, '')
+  const s = id
+    .trim()
+    .toLowerCase()
+    .replace(/\[[^\]]*\]/g, '')
+    .replace(/^claude-/, '')
+    .replace(/-\d{8}$/, '')
   const match = /^([a-z]+)(?:-(\d+))?(?:-(\d+))?$/.exec(s)
 
   const name = match?.[1]
@@ -276,27 +299,48 @@ export function render(template: string, v: TagValues): string {
   const when = dateParts(v.startedAt)
   const value = (token: string): string => {
     switch (token) {
-      case 'model': return v.model
-      case 'folder': return v.folder
-      case 'dir': return v.dir
-      case 'branch': return v.branch
-      case 'nth': return v.n > 1 ? String(v.n) : ''
-      case 'remote': return v.remote ?? ''
-      case 'topic': return v.topic ?? ''
-      case 'codename': return v.codename ?? ''
-      case 'sigil': return v.sigil ?? ''
-      case 'todaycount': return v.today ? String(v.today) : ''
-      case 'num': return String(v.n)
-      case 'host': return v.host
-      case 'family': return v.model.split(' ')[0] ?? ''
-      case 'datetime': return when.datetime
-      case 'date': return when.date
-      case 'day': return when.day
-      case 'time': return when.time
-      case 'updated': return updatedLabel(v.startedAt, v.updatedAt)
-      case 'updateddatetime': return dateParts(v.updatedAt).datetime
-      case 'updateddate': return dateParts(v.updatedAt).date
-      default: return ''
+      case 'model':
+        return v.model
+      case 'folder':
+        return v.folder
+      case 'dir':
+        return v.dir
+      case 'branch':
+        return v.branch
+      case 'nth':
+        return v.n > 1 ? String(v.n) : ''
+      case 'remote':
+        return v.remote ?? ''
+      case 'topic':
+        return v.topic ?? ''
+      case 'codename':
+        return v.codename ?? ''
+      case 'sigil':
+        return v.sigil ?? ''
+      case 'todaycount':
+        return v.today ? String(v.today) : ''
+      case 'num':
+        return String(v.n)
+      case 'host':
+        return v.host
+      case 'family':
+        return v.model.split(' ')[0] ?? ''
+      case 'datetime':
+        return when.datetime
+      case 'date':
+        return when.date
+      case 'day':
+        return when.day
+      case 'time':
+        return when.time
+      case 'updated':
+        return updatedLabel(v.startedAt, v.updatedAt)
+      case 'updateddatetime':
+        return dateParts(v.updatedAt).datetime
+      case 'updateddate':
+        return dateParts(v.updatedAt).date
+      default:
+        return ''
     }
   }
 
@@ -342,7 +386,27 @@ export function resolveTemplate(template: string, saved: Readonly<Record<string,
 }
 
 /** Words a saved template may not be called: the presets and the options. */
-export const RESERVED = ['presets', 'list', 'preview', 'template', 'force', 'apply', 'now', 'color', 'colour', 'off', 'on', 'help', 'save', 'delete', 'remove', 'topic', 'sigil', 'default', 'reset'] as const
+export const RESERVED = [
+  'presets',
+  'list',
+  'preview',
+  'template',
+  'force',
+  'apply',
+  'now',
+  'color',
+  'colour',
+  'off',
+  'on',
+  'help',
+  'save',
+  'delete',
+  'remove',
+  'topic',
+  'sigil',
+  'default',
+  'reset',
+] as const
 
 /** How many saved templates the store keeps. */
 export const MAX_SAVED = 20
@@ -480,7 +544,14 @@ export type Config = {
   sigils: Record<string, string>
 }
 
-export const DEFAULT_CONFIG: Config = { template: DEFAULT_PRESET, color: 'auto', isOn: true, offFolders: [], saved: {}, sigils: {} }
+export const DEFAULT_CONFIG: Config = {
+  template: DEFAULT_PRESET,
+  color: 'auto',
+  isOn: true,
+  offFolders: [],
+  saved: {},
+  sigils: {},
+}
 
 /**
  * A stored value as a Config, defaults filling whatever is missing or wrong.
@@ -617,13 +688,21 @@ export function isAlive(entry: LiveEntry, now: number): boolean {
  * @param others the other sessions' live entries, stale ones already dropped
  * @param colorChoice the config's color: auto, off, or a pinned name
  */
-export function assign(key: string, others: readonly LiveEntry[], colorChoice: string): { n: number; color: string | null } {
+export function assign(
+  key: string,
+  others: readonly LiveEntry[],
+  colorChoice: string,
+): { n: number; color: string | null } {
   const n = pickNumber(others.filter((o) => o.key === key).map((o) => o.n))
-  const color = colorChoice === 'off'
-    ? null
-    : (COLORS as readonly string[]).includes(colorChoice)
-      ? colorChoice
-      : pickColor(key, others.map((o) => o.color).filter((c): c is string => c !== null))
+  const color =
+    colorChoice === 'off'
+      ? null
+      : (COLORS as readonly string[]).includes(colorChoice)
+        ? colorChoice
+        : pickColor(
+            key,
+            others.map((o) => o.color).filter((c): c is string => c !== null),
+          )
 
   return { n, color }
 }
@@ -657,7 +736,7 @@ export type Parsed =
 
 export const USAGE = [
   'Usage: /nametag [preset|default|topic|template|save|delete|force|color|sigil|off|on|presets|help]',
-  '  /nametag                  show this session\'s tag and the live sessions',
+  "  /nametag                  show this session's tag and the live sessions",
   '  /nametag presets          preview every preset for this session',
   `  /nametag <preset>         use a preset from now on: ${PRESET_ORDER.join(', ')}`,
   `  /nametag default          back to the default preset (${DEFAULT_PRESET}); reset works too`,
@@ -707,12 +786,22 @@ const COMMAND_PREFIX = '/nametag '
  * @param start where that run begins in `text`
  * @param saved the person's saved templates by name
  */
-export function suggest(text: string, token: string, start: number, saved: Readonly<Record<string, string>> = {}): Suggestion[] {
+export function suggest(
+  text: string,
+  token: string,
+  start: number,
+  saved: Readonly<Record<string, string>> = {},
+): Suggestion[] {
   if (!text.toLowerCase().startsWith(COMMAND_PREFIX) || start < COMMAND_PREFIX.length) {
     return []
   }
 
-  const words = text.slice(COMMAND_PREFIX.length, start).trim().split(/\s+/).filter(Boolean).map((w) => w.toLowerCase())
+  const words = text
+    .slice(COMMAND_PREFIX.length, start)
+    .trim()
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((w) => w.toLowerCase())
   const typed = token.toLowerCase()
   const brace = token.lastIndexOf('{')
 
@@ -743,10 +832,14 @@ export function suggest(text: string, token: string, start: number, saved: Reado
     return rows
   }
 
-  const mine = Object.keys(saved).sort().map((name) => ({ name, description: `saved: ${saved[name] ?? ''}` }))
+  const mine = Object.keys(saved)
+    .sort()
+    .map((name) => ({ name, description: `saved: ${saved[name] ?? ''}` }))
 
   if (words.length === 0) {
-    return [...SUBCOMMANDS, ...mine].filter((c) => c.name.startsWith(typed)).map((c) => ({ text: c.name, description: c.description }))
+    return [...SUBCOMMANDS, ...mine]
+      .filter((c) => c.name.startsWith(typed))
+      .map((c) => ({ text: c.name, description: c.description }))
   }
 
   if (words.length === 1 && (words[0] === 'delete' || words[0] === 'remove')) {
@@ -754,10 +847,13 @@ export function suggest(text: string, token: string, start: number, saved: Reado
   }
 
   if (words.length === 1 && (words[0] === 'color' || words[0] === 'colour')) {
-    return ['auto', 'off', ...COLORS].filter((c) => c.startsWith(typed)).map((c) => ({
-      text: c,
-      description: c === 'auto' ? 'each folder its own color' : c === 'off' ? 'leave colors alone' : 'every session this color',
-    }))
+    return ['auto', 'off', ...COLORS]
+      .filter((c) => c.startsWith(typed))
+      .map((c) => ({
+        text: c,
+        description:
+          c === 'auto' ? 'each folder its own color' : c === 'off' ? 'leave colors alone' : 'every session this color',
+      }))
   }
 
   if (words.length === 1 && (words[0] === 'off' || words[0] === 'on') && 'here'.startsWith(typed)) {
@@ -799,7 +895,9 @@ export function parseArgs(args: string): Parsed {
   }
 
   if (word === 'template') {
-    return tail ? { kind: 'template', template: tail } : { kind: 'error', text: 'Give the template after the word, e.g. /nametag template {folder}{/branch}{ #n}' }
+    return tail
+      ? { kind: 'template', template: tail }
+      : { kind: 'error', text: 'Give the template after the word, e.g. /nametag template {folder}{/branch}{ #n}' }
   }
 
   if (word === 'force' || word === 'apply' || word === 'now') {
@@ -881,5 +979,8 @@ export function parseArgs(args: string): Parsed {
     return { kind: 'named', name: word }
   }
 
-  return { kind: 'error', text: `Unknown option "${first}". ${PRESET_ORDER.join(', ')} are the presets; /nametag help lists the rest.` }
+  return {
+    kind: 'error',
+    text: `Unknown option "${first}". ${PRESET_ORDER.join(', ')} are the presets; /nametag help lists the rest.`,
+  }
 }

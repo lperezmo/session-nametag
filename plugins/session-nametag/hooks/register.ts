@@ -42,7 +42,6 @@ import {
   mustYield,
   parseArgs,
   PRESET_ORDER,
-  PRESETS,
   render,
   resolveTemplate,
   SEEN_PREFIX,

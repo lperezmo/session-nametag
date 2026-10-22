@@ -285,7 +285,6 @@ describe('force', () => {
 describe('new tokens', () => {
   const STATUS = { [CONFIG_KEY]: { template: 'status', color: 'off', isOn: true, offFolders: [] } }
   const lastRename = (w: World) => w.ran.filter((r) => r.startsWith('rename')).pop()
-  const turn = (id: string) => ({ answer: '', durationMs: 1, isAborted: false, turnId: id, reason: 'answer' }) as never
 
   test('/nametag topic sets and off clears', async ($, on) => {
     const w = world(on, { stored: STATUS })

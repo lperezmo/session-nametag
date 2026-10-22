@@ -14,12 +14,5 @@
   "privacyPolicyUrl": "https://github.com/lperezmo/session-nametag#what-it-does-on-your-machine",
   "termsOfServiceUrl": "https://github.com/lperezmo/session-nametag/blob/main/LICENSE",
   "license": "MIT",
-  "keywords": [
-    "session name",
-    "rename",
-    "color",
-    "git branch",
-    "remote control",
-    "mod"
-  ]
+  "keywords": ["session name", "rename", "color", "git branch", "remote control", "mod"]
 }

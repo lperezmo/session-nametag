@@ -54,7 +54,17 @@ import {
   type Token,
   usedTokens,
 } from './tag'
-import { branchFromHead, codenameFor, dayKey, gitDirFromFile, macHostName, originFromConfig, remoteSlug, shorten, sigilFor } from './extras'
+import {
+  branchFromHead,
+  codenameFor,
+  dayKey,
+  gitDirFromFile,
+  macHostName,
+  originFromConfig,
+  remoteSlug,
+  shorten,
+  sigilFor,
+} from './extras'
 
 const COMMAND_NAME = 'nametag'
 
@@ -243,7 +253,12 @@ async function readOrigin($: EngineInterface, repo: Repo): Promise<string> {
  * @param isAll work out every token, not only the ones the template uses
  *   (the presets preview)
  */
-async function values($: EngineInterface, n: number, at?: string, isAll = false): Promise<{ v: TagValues; key: string }> {
+async function values(
+  $: EngineInterface,
+  n: number,
+  at?: string,
+  isAll = false,
+): Promise<{ v: TagValues; key: string }> {
   const config = await readConfig($)
   const used = usedTokens(resolveTemplate(config.template, config.saved))
   const wants = (...tokens: Token[]) => isAll || tokens.some((t) => used.has(t))
@@ -314,7 +329,13 @@ async function isOff($: EngineInterface, config: Config, key: string): Promise<b
  * @param delayMs the wait before the first try
  * @param tries attempts left
  */
-function runSoon($: EngineInterface, title: string | null, color: string | null, delayMs = DEFER_MS, tries = RUN_RETRIES) {
+function runSoon(
+  $: EngineInterface,
+  title: string | null,
+  color: string | null,
+  delayMs = DEFER_MS,
+  tries = RUN_RETRIES,
+) {
   if (!title && !color) {
     return
   }
@@ -332,7 +353,9 @@ function runSoon($: EngineInterface, title: string | null, color: string | null,
       if (tries > 1) {
         runSoon($, title, color, RUN_RETRY_MS, tries - 1)
       } else {
-        $.ui.log(`session-nametag could not tag this session: ${error instanceof Error ? error.message : String(error)}`)
+        $.ui.log(
+          `session-nametag could not tag this session: ${error instanceof Error ? error.message : String(error)}`,
+        )
       }
     }
   })
@@ -350,12 +373,28 @@ function runSoon($: EngineInterface, title: string | null, color: string | null,
  * @param keep a color to keep instead of picking one (a resume), or undefined
  * @param preferN the number to keep when it is still free (a resume)
  */
-async function claim($: EngineInterface, id: string, key: string, config: Config, keep?: string | null, preferN?: number): Promise<LiveEntry> {
+async function claim(
+  $: EngineInterface,
+  id: string,
+  key: string,
+  config: Config,
+  keep?: string | null,
+  preferN?: number,
+): Promise<LiveEntry> {
   const now = await $.clock.now()
   let live = await others($, id)
   const picked = assign(key, live, config.color)
   const isFree = preferN !== undefined && !live.some((o) => o.key === key && o.n === preferN)
-  const entry: LiveEntry = { id, key, n: isFree ? preferN : picked.n, color: keep === undefined ? picked.color : keep, at: now, title: null, isManual: false, codename: codenameFor(id) }
+  const entry: LiveEntry = {
+    id,
+    key,
+    n: isFree ? preferN : picked.n,
+    color: keep === undefined ? picked.color : keep,
+    at: now,
+    title: null,
+    isManual: false,
+    codename: codenameFor(id),
+  }
 
   await save($, entry)
 
@@ -410,7 +449,17 @@ async function tagAtStart($: EngineInterface) {
 
   if (seen) {
     me = await claim($, id, key, config, seen.color, seen.n)
-    me = { ...me, today, ...(seen.codename ? { codename: seen.codename } : {}), ...(seen.topic ? { topic: seen.topic } : {}), ...(seen.isTopicSet ? { isTopicSet: true } : {}), title: seen.title, isManual: seen.isManual, ...(seen.updatedAt ? { updatedAt: seen.updatedAt } : {}), ...(seen.root ? { root: seen.root } : {}) }
+    me = {
+      ...me,
+      today,
+      ...(seen.codename ? { codename: seen.codename } : {}),
+      ...(seen.topic ? { topic: seen.topic } : {}),
+      ...(seen.isTopicSet ? { isTopicSet: true } : {}),
+      title: seen.title,
+      isManual: seen.isManual,
+      ...(seen.updatedAt ? { updatedAt: seen.updatedAt } : {}),
+      ...(seen.root ? { root: seen.root } : {}),
+    }
 
     const { v } = await values($, me.n)
     let title = me.isManual ? null : render(resolveTemplate(config.template, config.saved), v)
@@ -588,7 +637,20 @@ async function applyNow($: EngineInterface, isPin = false): Promise<string> {
  */
 async function retire($: EngineInterface, entry: LiveEntry) {
   await $.store.delete(`${LIVE_PREFIX}${entry.id}`)
-  await $.store.set(`${SEEN_PREFIX}${entry.id}`, { id: entry.id, n: entry.n, color: entry.color, title: entry.title, isManual: entry.isManual, at: await $.clock.now(), updatedAt: entry.updatedAt, root: entry.root, topic: entry.topic, isTopicSet: entry.isTopicSet, codename: entry.codename, today: entry.today })
+  await $.store.set(`${SEEN_PREFIX}${entry.id}`, {
+    id: entry.id,
+    n: entry.n,
+    color: entry.color,
+    title: entry.title,
+    isManual: entry.isManual,
+    at: await $.clock.now(),
+    updatedAt: entry.updatedAt,
+    root: entry.root,
+    topic: entry.topic,
+    isTopicSet: entry.isTopicSet,
+    codename: entry.codename,
+    today: entry.today,
+  })
 }
 
 /**
@@ -621,7 +683,9 @@ async function status($: EngineInterface): Promise<string> {
       ? `saved "${config.template}" (${config.saved[config.template] ?? ''})`
       : `template ${config.template}`
   const lines = [
-    me ? `This session: ${me.title ?? '(name left as is)'}${me.color ? `, ${me.color}` : ''}${me.isManual ? ', name kept as you set it' : ''}` : 'This session is not tagged. /nametag force tags it.',
+    me
+      ? `This session: ${me.title ?? '(name left as is)'}${me.color ? `, ${me.color}` : ''}${me.isManual ? ', name kept as you set it' : ''}`
+      : 'This session is not tagged. /nametag force tags it.',
     `Naming: ${template}. Color: ${config.color}.${config.isOn ? '' : ' Off for new sessions.'}${config.offFolders.length ? ` Off in ${config.offFolders.length} folder(s).` : ''}`,
   ]
 
@@ -673,7 +737,9 @@ export function register(on: On) {
 
     $.clock.after(0, () => {
       tagAtStart($).catch((error: unknown) => {
-        $.ui.log(`session-nametag could not tag this session: ${error instanceof Error ? error.message : String(error)}`)
+        $.ui.log(
+          `session-nametag could not tag this session: ${error instanceof Error ? error.message : String(error)}`,
+        )
       })
     })
 
@@ -746,10 +812,18 @@ export function register(on: On) {
         const config = await readConfig($)
         const names = [...PRESET_ORDER, ...Object.keys(config.saved).sort()]
         const width = Math.max(8, ...names.map((name) => name.length))
-        const lines = names.map((name) => `${name === config.template ? '>' : ' '} ${name.padEnd(width)} ${render(resolveTemplate(name, config.saved), v)}`)
-        const custom = isPreset(config.template) || config.saved[config.template] !== undefined ? [] : [`> ${'(yours)'.padEnd(width)} ${render(config.template, v)}   /nametag save <name> keeps it`]
+        const lines = names.map(
+          (name) =>
+            `${name === config.template ? '>' : ' '} ${name.padEnd(width)} ${render(resolveTemplate(name, config.saved), v)}`,
+        )
+        const custom =
+          isPreset(config.template) || config.saved[config.template] !== undefined
+            ? []
+            : [`> ${'(yours)'.padEnd(width)} ${render(config.template, v)}   /nametag save <name> keeps it`]
 
-        return { text: ['Presets for this session (> is in use; /nametag <name> picks one):', ...lines, ...custom].join('\n') }
+        return {
+          text: ['Presets for this session (> is in use; /nametag <name> picks one):', ...lines, ...custom].join('\n'),
+        }
       }
       case 'preset':
       case 'template': {
@@ -765,7 +839,9 @@ export function register(on: On) {
         const config = await readConfig($)
 
         if (config.saved[parsed.name] === undefined) {
-          return { text: `No preset or saved template called "${parsed.name}". /nametag presets lists them; /nametag help lists the options.` }
+          return {
+            text: `No preset or saved template called "${parsed.name}". /nametag presets lists them; /nametag help lists the options.`,
+          }
         }
 
         await $.store.set(CONFIG_KEY, { ...config, template: parsed.name })
@@ -782,7 +858,11 @@ export function register(on: On) {
           return { text: `You have ${MAX_SAVED} saved templates already; /nametag delete <name> makes room.` }
         }
 
-        await $.store.set(CONFIG_KEY, { ...config, saved: { ...config.saved, [parsed.name]: text }, template: parsed.name })
+        await $.store.set(CONFIG_KEY, {
+          ...config,
+          saved: { ...config.saved, [parsed.name]: text },
+          template: parsed.name,
+        })
 
         if (parsed.template) {
           const title = await applyNow($)
@@ -790,7 +870,9 @@ export function register(on: On) {
           return { text: `Saved "${parsed.name}" and using it: ${title}` }
         }
 
-        return { text: `${isNew ? 'Saved' : 'Updated'} "${parsed.name}": ${text}. /nametag ${parsed.name} brings it back.` }
+        return {
+          text: `${isNew ? 'Saved' : 'Updated'} "${parsed.name}": ${text}. /nametag ${parsed.name} brings it back.`,
+        }
       }
       case 'topic': {
         if (!me) {
@@ -801,9 +883,10 @@ export function register(on: On) {
           return { text: me.topic ? `Topic: ${me.topic}` : 'No topic yet. /nametag topic <text> sets one.' }
         }
 
-        me = parsed.mode === 'set'
-          ? { ...me, topic: shorten(parsed.text, 40), isTopicSet: true }
-          : { ...me, topic: '', isTopicSet: true }
+        me =
+          parsed.mode === 'set'
+            ? { ...me, topic: shorten(parsed.text, 40), isTopicSet: true }
+            : { ...me, topic: '', isTopicSet: true }
         await save($, me)
         await refresh($)
 
@@ -862,7 +945,9 @@ export function register(on: On) {
           await save($, me)
           runSoon($, null, color)
 
-          return { text: `Color: ${parsed.color}${color && color !== parsed.color ? ` (${color} for this session)` : ''}.` }
+          return {
+            text: `Color: ${parsed.color}${color && color !== parsed.color ? ` (${color} for this session)` : ''}.`,
+          }
         }
 
         if (me && parsed.color === 'off') {
@@ -877,7 +962,9 @@ export function register(on: On) {
 
         if (parsed.isHere) {
           const { key } = await values($, 1)
-          const offFolders = parsed.isOn ? config.offFolders.filter((k) => k !== key) : [...new Set([...config.offFolders, key])]
+          const offFolders = parsed.isOn
+            ? config.offFolders.filter((k) => k !== key)
+            : [...new Set([...config.offFolders, key])]
 
           await $.store.set(CONFIG_KEY, { ...config, offFolders })
 
@@ -886,7 +973,11 @@ export function register(on: On) {
 
         await $.store.set(CONFIG_KEY, { ...config, isOn: parsed.isOn })
 
-        return { text: parsed.isOn ? 'New sessions will be tagged again.' : 'New sessions will be left alone. /nametag on turns it back on.' }
+        return {
+          text: parsed.isOn
+            ? 'New sessions will be tagged again.'
+            : 'New sessions will be left alone. /nametag on turns it back on.',
+        }
       }
     }
   })
